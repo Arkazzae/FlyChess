@@ -23,6 +23,7 @@ describe("saved fly selection", () => {
     ["plan4", "tactician"],
     ["mysl4", "thinker"],
     ["reflex", "scout"], ["rookie", "scout"], ["planner", "tactician"], ["scribe", "tactician"], ["elder", "thinker"],
+    ["sage", "sage"],
   ])("restores %s as %s and persists the English identifier", async (previous, current) => {
     const settings = { mode: "vsFly", level: previous, side: "b", timeId: "3+2", showThoughts: true, showEval: true };
     const storage = mockStorage(JSON.stringify(settings));

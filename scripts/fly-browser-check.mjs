@@ -48,7 +48,7 @@ try {
   });
   assert.equal(report.brainStatus, "droso-1");
   assert.equal(await page.locator(".gen-pick").count(), 0);
-  assert.equal(await page.locator(".bot-card").count(), 3);
+  assert.equal(await page.locator(".bot-card").count(), 4);
   assert.ok(await page.locator(".bot-card img").evaluateAll(images => images.every(img => img.complete && img.naturalWidth > 0)));
   assert.ok(!/fly-v[46]|trained by Arkazzae/.test(await page.locator("body").innerText()));
   assert.equal((await page.locator(".right-panel__header h2").textContent())?.trim(), "Play the Fly", "English by default");
@@ -170,15 +170,18 @@ try {
     const results = [];
     for (const level of FLY_LEVELS) {
       const { decision } = await getFlyEngine().think("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", level.plan, false, true);
-      results.push({id:level.id, model:getFlyEngine().model, visits:decision.simulations, budget:level.plan.simulations, move:decision.move});
+      results.push({id:level.id, model:getFlyEngine().model, visits:decision.simulations, budget:level.plan.simulations, adaptive:!!level.plan.adaptive, move:decision.move});
     }
     return results;
   });
   for (const style of report.styles) {
     assert.equal(style.model, "droso-1");
-    assert.equal(style.visits, style.budget);
+    // The Sage's budget is a ceiling it may stop short of; the others always use all of theirs.
+    if (style.adaptive) assert.ok(style.visits >= 1 && style.visits <= style.budget, `Sage used ${style.visits} of ${style.budget}`);
+    else assert.equal(style.visits, style.budget);
   }
-  report.checks.push("DROSO-1: Scout 8, Tactician 32 and Thinker 64 complete their search budgets");
+  const sage = report.styles.find((style) => style.adaptive);
+  report.checks.push(`DROSO-1: Scout 8, Tactician 32 and Thinker 64 complete their search budgets; Sage used ${sage.visits} of ${sage.budget}`);
 
   // --- numerics: WebGPU against the CPU reference on the real connectome ---
   report.gpu = await page.evaluate(async () => {

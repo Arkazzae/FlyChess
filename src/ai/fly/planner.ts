@@ -1,5 +1,5 @@
 /** DROSO-1 PUCT: all legal actions, current CP value, solved mates, bounded visits.
- * Mirrors training/core/puct.py and training/droso1/player.py.
+ * Mirrors training/core/puct.py and training/droso1/player.py; the adaptive budget is browser-only.
  */
 import { Chess } from "chess.js";
 import type { BrainOutput } from "./brain.ts";
@@ -16,6 +16,8 @@ export interface PlanOptions {
   now?: () => number;
   seen?: Record<string, number>;
   halfmoveKnown?: boolean;
+  /** Treat `simulations` as a ceiling and stop as soon as the choice is settled (a browser play setting). */
+  adaptive?: boolean;
 }
 export const DEFAULT_PLAN: PlanOptions = { simulations: 64, cPuct: 1.5, temperature: 0 };
 export interface PlannedCandidate {
@@ -113,6 +115,31 @@ function eligible(n: Node): Node[] {
   return safe.length ? safe : all;
 }
 function best(n: Node): Node | undefined { return eligible(n).sort((a,b)=>b.visits-a.visits || b.prior-a.prior)[0]; }
+/** Instinct strong enough to move after the root evaluation alone. */
+export const ADAPTIVE_INSTINCT = 0.9;
+/** Visit lead, in units of √(visits so far), that counts as a settled search. */
+export const ADAPTIVE_LEAD = 2;
+/** After this many simulations, two leading moves valued this close (≈12 centipawns) are equally good. */
+export const ADAPTIVE_EVEN_AFTER = 64;
+export const ADAPTIVE_EVEN = 0.02;
+/**
+ * Adaptive budget: is the choice settled before the ceiling? True when only one move is playable,
+ * when the instinct alone is decisive, when the runner-up can no longer catch up in visits, when
+ * the leader is well ahead in visits and still looks at least as good as the runner-up, or when the
+ * two leading moves have long looked equally good, so more thought would not change much.
+ */
+function settled(root: Node, ceiling: number): boolean {
+  // A copy: eligible() can return the children themselves, whose order the search relies on.
+  const [first, second] = [...eligible(root)].sort((a,b)=>b.visits-a.visits || b.prior-a.prior);
+  if (!second) return true;
+  const n = root.visits-1;
+  if (n===0) return first.prior>=ADAPTIVE_INSTINCT;
+  const lead = first.visits-second.visits;
+  if (lead > ceiling-root.visits) return true;
+  const q = (c: Node) => c.proof!==null ? -c.proof : c.visits ? -c.total/c.visits : -Infinity;
+  if (lead>=ADAPTIVE_LEAD*Math.sqrt(n) && q(first)>=q(second)) return true;
+  return root.visits>=ADAPTIVE_EVEN_AFTER && second.visits>0 && Math.abs(q(first)-q(second))<ADAPTIVE_EVEN;
+}
 function line(n: Node): string[] {
   const result: string[]=[];
   let c: Node | undefined=n;
@@ -156,6 +183,7 @@ export async function plan(position: Chess, evaluate: Evaluator, options: Partia
   await expand(root); backup([root],root.initial);
   for(let i=1;i<opts.simulations && root.proof===null;i++) {
     if(opts.budgetMs!==undefined && now()-started>=opts.budgetMs) break;
+    if(opts.adaptive && (root.visits===1 || root.visits%8===0) && settled(root,opts.simulations)) break;
     let n=root; const path=[root];
     while(n.children!==null && n.proof===null) {
       let candidates=n.children.filter(c=>c.proof!==1); if(!candidates.length) candidates=n.children;

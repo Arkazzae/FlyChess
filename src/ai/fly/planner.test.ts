@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Chess } from "chess.js";
 import type { BrainOutput } from "./brain";
 import { encodeBoard, MOVE_SPACE, SQUARE_FEATURES, type EncodedBoard } from "./encoding";
-import { drawClaim, plan, rankLegalMoves, seenPositions } from "./planner";
+import { ADAPTIVE_EVEN_AFTER, ADAPTIVE_INSTINCT, drawClaim, plan, rankLegalMoves, seenPositions } from "./planner";
 
 function output(board: EncodedBoard, favorite = "e2e4", value = 0): BrainOutput {
   const policy=new Float32Array(MOVE_SPACE).fill(-20);
@@ -35,6 +35,38 @@ describe("DROSO-1 PUCT",()=> {
       chosen.add(d.move);
     }
     expect(chosen.size).toBeGreaterThan(1);
+  });
+  it("searches exactly as before unless the adaptive budget is asked for",async()=> {
+    const fixed=await plan(new Chess(),b=>output(b,"e2e4",.5),{simulations:32});
+    expect(await plan(new Chess(),b=>output(b,"e2e4",.5),{simulations:32,adaptive:false})).toEqual(fixed);
+    expect(fixed.simulations).toBe(32);
+  });
+  it("adaptive: moves at once with one legal move or a decisive instinct",async()=> {
+    const forced=await plan(new Chess("7k/8/8/8/8/8/6q1/7K w - - 0 1"),b=>output(b),{simulations:256,adaptive:true});
+    expect([forced.move,forced.simulations]).toEqual(["h1g2",1]);
+    const sure=await plan(new Chess(),b=>{const o=output(b);for(const [i,u] of b.legal)if(u==="e2e4")o.policy[i]=6;return o;},{simulations:256,adaptive:true});
+    expect(sure.candidates.find(c=>c.uci==="e2e4")!.prior).toBeGreaterThanOrEqual(ADAPTIVE_INSTINCT);
+    expect([sure.move,sure.simulations]).toEqual(["e2e4",1]);
+  });
+  it("adaptive: stops early once the search agrees with a clear favourite",async()=> {
+    // All visits go to the favourite: settled at the first check.
+    const d=await plan(new Chess(),b=>output(b),{simulations:256,adaptive:true});
+    expect([d.move,d.simulations]).toEqual(["e2e4",8]);
+  });
+  // Two equally likely first moves; everything else is an afterthought.
+  const twins=(b:EncodedBoard,value=0)=>{const o=output(b,"none",value);for(const [i,u] of b.legal)if(u==="e2e4"||u==="d2d4")o.policy[i]=4;return o;};
+  it("adaptive: stops when the leading moves have long looked equally good",async()=> {
+    const even=await plan(new Chess(),b=>twins(b),{simulations:256,adaptive:true});
+    expect(even.simulations).toBe(ADAPTIVE_EVEN_AFTER);
+    expect(["e2e4","d2d4"]).toContain(even.move);
+  });
+  it("adaptive: thinks past the usual budget while it cannot tell the leading moves apart",async()=> {
+    // Evaluations that disagree with each other: neither a clear leader nor two equal values.
+    const noisy=()=>{let calls=0;return (b:EncodedBoard)=>twins(b,((calls++*37)%23)/23*.6-.3);};
+    const long=await plan(new Chess(),noisy(),{simulations:256,adaptive:true});
+    expect(long.simulations).toBeGreaterThan(ADAPTIVE_EVEN_AFTER);
+    expect(long.simulations).toBeLessThanOrEqual(256);
+    expect((await plan(new Chess(),noisy(),{simulations:40,adaptive:true})).simulations).toBeLessThanOrEqual(40);
   });
   it("ignores unsupervised auxiliary heads",async()=> {
     const board=new Chess();

@@ -270,13 +270,16 @@ button:focus-visible, select:focus-visible, input:focus-visible, canvas:focus-vi
 .bot-select__section h3 { margin: 0 0 9px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); font-weight: 700; }
 .bot-select__note { margin: 7px 0 0; font-size: 11px; line-height: 1.35; color: var(--muted); }
 .bot-select__self { margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-2); }
-.bot-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.bot-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+/* Portrait on the left, name and search style stacked beside it. */
 .bot-card {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-rows: 1fr 1fr;
+  column-gap: 10px;
   align-items: center;
-  gap: 2px;
-  padding: 8px 6px 7px;
+  text-align: left;
+  padding: 7px 10px;
   background: var(--btn);
   border: 0;
   border-radius: 5px;
@@ -287,9 +290,9 @@ button:focus-visible, select:focus-visible, input:focus-visible, canvas:focus-vi
 .bot-card:hover { background: var(--btn-hi); }
 .bot-card:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--btn-shadow); }
 .bot-card.is-selected { box-shadow: 0 0 0 3px var(--green), 0 3px 0 var(--btn-shadow); }
-.bot-card__img { width: 46px; height: 46px; border-radius: 5px; display: grid; place-items: center; }
-.bot-card__name { font-weight: 700; font-size: 13.5px; }
-.bot-card__rating { color: var(--text-2); font-size: 12.5px; }
+.bot-card__img { grid-row: 1 / 3; width: 40px; height: 40px; border-radius: 5px; display: grid; place-items: center; }
+.bot-card__name { align-self: end; font-weight: 700; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bot-card__rating { align-self: start; color: var(--text-2); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .side-pick { display: flex; gap: 10px; justify-content: center; }
 .side-pick button {
   width: 54px;
@@ -430,9 +433,19 @@ button:focus-visible, select:focus-visible, input:focus-visible, canvas:focus-vi
 .game-tab__nav { margin-left: auto; display: flex; gap: 2px; }
 
 /* Short laptop screens: keep the bot screen free of scrolling. */
-@media (max-height: 740px) and (min-width: 641px) {
+@media (max-height: 800px) and (min-width: 641px) {
   .bot-select__note { display: none; }
-  .bot-hero { padding-top: 12px; padding-bottom: 10px; }
+  .bot-hero { padding-top: 10px; padding-bottom: 8px; }
+  .bot-hero__portrait { width: 60px; height: 60px; }
+  .bot-hero .speech { padding: 7px 11px; font-size: 13px; }
+  .bot-select__section { padding-top: 9px; padding-bottom: 2px; }
+  .bot-select__section h3 { margin-bottom: 7px; }
+  .mode-pick button { padding: 7px 6px; font-size: 13.5px; }
+  .bot-card { padding: 5px 10px; }
+  .side-pick button { width: 46px; height: 46px; }
+  .side-king { width: 34px; height: 34px; }
+  .bot-select__row { gap: 4px; padding-top: 10px !important; padding-bottom: 10px !important; }
+  .bot-select__footer { padding: 10px 20px 12px; }
 }
 
 /* ── Review ── */

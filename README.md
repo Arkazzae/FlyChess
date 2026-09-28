@@ -17,6 +17,8 @@ pick a fly, pick a colour, press **Play**.
 
 - **Scout** looks at 8 positions before it moves, **Tactician** at 32,
   **Thinker** at 64. Same brain, different patience.
+- **Sage** decides for itself: one look for an obvious move, up to 256 when it
+  can't make up its mind.
 - **Fly vs fly** lets it play against itself. Pause whenever you like and look
   inside both brains.
 - The first visit downloads the brain (about 51 MB). After that everything
@@ -36,7 +38,7 @@ brain regions, the moves it is weighing, and the board as its eyes see it.
 Better than you'd expect from something that tastes with its feet. The Thinker
 scored about **1500** in 64 games against a deliberately weakened Stockfish 19
 ([how we tested](benchmarks/droso-1/README.md)). That number belongs to this
-one test, not to FIDE, and Scout and Tactician haven't been measured.
+one test, not to FIDE, and the other flies haven't been measured.
 
 It learned from scratch which moves look promising and who is winning, working
 through 26 million chess positions (some more than once). Not bad for a

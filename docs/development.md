@@ -57,7 +57,8 @@ Alternatively, install Playwright's Chromium with
 - the recorded propagation: 11 frames, activity spreading, group flows;
 - the hint and takeback;
 - the brain views render;
-- post-game review and replay, all three search budgets, and draw claims;
+- post-game review and replay, all four search budgets (the adaptive Sage
+  within its ceiling), and draw claims;
 - fly vs fly: the brain plays both sides, the board stays read-only and
   pause holds the game;
 - WebGPU agrees with the CPU on the full connectome within numeric tolerances,

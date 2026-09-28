@@ -53,9 +53,10 @@ replies shown in the interface come from the search tree.
 
 ## Search
 
-All three opponents use the same checkpoint and PUCT algorithm with exploration
+All four opponents use the same checkpoint and PUCT algorithm with exploration
 constant 1.5. Scout gets **8 simulations**, Tactician **32**, and Thinker **64**,
-including the root evaluation and visits to terminal positions. Search stops
+including the root evaluation and visits to terminal positions. Sage gets up to
+**256** and decides how many it needs (see below). Search stops
 early if it proves the root's result; otherwise untimed games finish that
 budget, while timed games may stop earlier. Policy priors guide exploration,
 and values from visited positions determine which continuations deserve more
@@ -66,6 +67,25 @@ precedence over neural scores. Checkmate, stalemate, insufficient material,
 threefold claims and fifty-move claims use exact rules. A second occurrence
 alone is not scored as a draw. The final choice favours visit count, then prior;
 there is no opening-book or Stockfish move fallback.
+
+### Sage: an adaptive budget
+
+Sage treats 256 simulations as a ceiling. It checks after the root evaluation
+and then every 8 simulations, and stops as soon as one of these holds:
+
+- only one move is playable, or the policy gives one move at least 90%
+  (it moves after a single evaluation);
+- the most-visited move leads the runner-up by more visits than remain;
+- that lead is at least 2·√n visits (n = visits so far) and the leader's value
+  is at least the runner-up's;
+- after 64 simulations, the two leading moves' values are within 0.02
+  (about 12 centipawns), so the choice between them hardly matters.
+
+Otherwise it keeps searching. On about 110 positions from three benchmark games
+it used 64.8 simulations on average, about as many as Thinker, spread from 1 to
+256. The
+adaptive stop is a browser play setting; the Python player in `training/` and
+`artifacts/` has no equivalent and always completes its budget.
 
 When the fly plays itself (**Fly vs fly**), both sides use the selected search
 budget. Its first eight half-moves are sampled in proportion to visit count
