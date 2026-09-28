@@ -119,9 +119,10 @@ button:focus-visible, select:focus-visible, input:focus-visible, canvas:focus-vi
 .sidebar__tools :is(button, a):hover { background: #3c3a37 !important; color: #fff; }
 .sidebar__lang { min-width: 44px; font-size: 12px; font-weight: 800; letter-spacing: 0.5px; text-align: center !important; }
 .sidebar__tool { width: 32px; }
-.lang-pick { display: flex; gap: 8px; }
-.lang-pick button { flex: 1; padding: 9px; border: 0; border-radius: 5px; background: var(--btn); box-shadow: 0 3px 0 var(--btn-shadow); color: var(--text-2); font-weight: 700; cursor: pointer; }
-.lang-pick button.is-selected { background: var(--green); color: #fff; box-shadow: 0 3px 0 var(--green-shadow); }
+.lang-pick, .mode-pick { display: flex; gap: 8px; }
+.lang-pick button, .mode-pick button { flex: 1; padding: 9px; border: 0; border-radius: 5px; background: var(--btn); box-shadow: 0 3px 0 var(--btn-shadow); color: var(--text-2); font-weight: 700; cursor: pointer; }
+.lang-pick button.is-selected, .mode-pick button.is-selected { background: var(--green); color: #fff; box-shadow: 0 3px 0 var(--green-shadow); }
+.mode-pick button:not(.is-selected):hover { background: var(--btn-hi); color: #fff; }
 
 /* ── Play page ── */
 .play-page {
@@ -268,6 +269,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, canvas:focus-vi
 .bot-select__section { padding: 12px 20px 4px; }
 .bot-select__section h3 { margin: 0 0 9px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); font-weight: 700; }
 .bot-select__note { margin: 7px 0 0; font-size: 11px; line-height: 1.35; color: var(--muted); }
+.bot-select__self { margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-2); }
 .bot-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .bot-card {
   display: flex;
@@ -524,6 +526,26 @@ button:focus-visible, select:focus-visible, input:focus-visible, canvas:focus-vi
 .brain-tab { flex: 1; min-height: 0; overflow-y: auto; }
 .brain-tab__cloud { position: relative; }
 .brain-tab__expand { position: absolute; top: 8px; right: 8px; background: rgba(0, 0, 0, 0.45); border: 0; border-radius: 5px; padding: 6px; color: #fff; cursor: pointer; display: grid; z-index: 2; }
+/* Fly vs fly: two brains side by side */
+.duel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 10px 10px 0; }
+.duel-brain { display: flex; flex-direction: column; min-width: 0; border: 2px solid #2c2b28; border-radius: 8px; overflow: hidden; background: var(--panel-deep); transition: border-color 0.2s, box-shadow 0.2s; }
+.duel-brain.is-selected { border-color: var(--green); }
+.duel-brain.is-live { box-shadow: 0 0 14px rgba(224, 163, 58, 0.4); }
+.duel-brain__head { display: flex; align-items: center; gap: 6px; width: 100%; padding: 6px 8px; border: 0; background: none; color: var(--text); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer; }
+.duel-brain__head:hover { background: rgba(255, 255, 255, 0.05); }
+.duel-brain__head img { width: 20px; height: 20px; flex: none; }
+.duel-brain__head span { margin-left: auto; font-size: 10.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.duel-brain.is-live .duel-brain__head span { color: #e0a33a; }
+.duel-brain .brain-cloud { height: 168px; }
+.duel-brain__wave { height: 3px; background: #2c2b28; }
+.duel-brain__wave i { display: block; width: 0; height: 100%; background: linear-gradient(90deg, #4fc3d9, #b48cff 60%, var(--gold)); }
+.duel-brain__move { margin: 0; padding: 7px 8px 8px; font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.duel-brain__move b { color: #fff; }
+.duel-brain__move em { margin-left: 6px; font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
+.duel-pick { display: flex; gap: 6px; padding: 10px 10px; }
+.duel-pick button { flex: 1; padding: 6px 8px; border: 0; border-radius: 5px; background: var(--btn); box-shadow: 0 2px 0 var(--btn-shadow); color: var(--text-2); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.duel-pick button:hover:not(.is-selected) { background: var(--btn-hi); color: #fff; }
+.duel-pick button.is-selected { background: var(--green); color: #fff; box-shadow: 0 2px 0 var(--green-shadow); }
 .brain-cloud { position: relative; height: 290px; background: radial-gradient(ellipse at 50% 45%, #121820 0%, #090b0e 75%); }
 .brain-cloud--large { height: min(62dvh, 640px); }
 .brain-cloud canvas { display: block; width: 100%; height: 100%; cursor: grab; }

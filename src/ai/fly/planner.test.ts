@@ -24,6 +24,18 @@ describe("DROSO-1 PUCT",()=> {
     const ranked=rankLegalMoves(out,board);
     expect(ranked.ranked.reduce((s,c)=>s+c.prior,0)).toBeCloseTo(1);
   });
+  it("samples only among searched moves above zero temperature",async()=> {
+    const chosen=new Set<string>();
+    for(const r of [0,.2,.4,.6,.8,.999]) {
+      // Every position looks good for the side to move, so replies look bad and visits spread out.
+      const d=await plan(new Chess(),b=>output(b,"e2e4",.5),{simulations:8,temperature:1,random:()=>r});
+      const visited=d.candidates.filter(c=>c.visits>0).map(c=>c.uci);
+      expect(visited.length).toBeLessThan(d.candidates.length);
+      expect(visited).toContain(d.move);
+      chosen.add(d.move);
+    }
+    expect(chosen.size).toBeGreaterThan(1);
+  });
   it("ignores unsupervised auxiliary heads",async()=> {
     const board=new Chess();
     const a=await plan(board,b=>output(b),{simulations:8});

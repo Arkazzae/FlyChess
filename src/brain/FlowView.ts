@@ -8,7 +8,7 @@
  */
 
 import { GROUP_COUNT } from "@/ai/fly/brain";
-import { brainClock } from "./clock";
+import { brainClock, type BrainClock } from "./clock";
 import { GROUP_COLORS } from "./CloudView";
 import { sampleRow } from "./stats";
 
@@ -94,17 +94,18 @@ export class FlowView {
     private readonly groupNames: string[],
     private readonly groupCounts: number[],
     private readonly text: { board: string; readout: string; move: string; layers: string[] },
+    private readonly clock: BrainClock = brainClock,
   ) {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas 2D is not available.");
     this.ctx = ctx;
     this.maxCount = Math.max(1, ...groupCounts);
-    this.unsubscribe = brainClock.subscribe((t, now) => this.draw(t, now));
+    this.unsubscribe = clock.subscribe((t, now) => this.draw(t, now));
   }
 
   private sample(t: number): void {
-    const trace = brainClock.trace;
-    const stats = brainClock.stats;
+    const trace = this.clock.trace;
+    const stats = this.clock.stats;
     this.flow.fill(0);
     this.mean.fill(0);
     this.readout.fill(0);
@@ -137,8 +138,8 @@ export class FlowView {
     ctx.clearRect(0, 0, w, h);
     this.sample(t);
 
-    const stats = brainClock.stats;
-    const live = !!brainClock.trace;
+    const stats = this.clock.stats;
+    const live = !!this.clock.trace;
     const flowMax = stats?.flowMax ?? 1;
     const meanMax = stats?.meanMax ?? 1;
     const readoutMax = stats?.readoutMax ?? 1;

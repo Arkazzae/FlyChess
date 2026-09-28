@@ -1,4 +1,4 @@
-import { useGameStore } from "@/state/game";
+import { isSelfPlay, useGameStore } from "@/state/game";
 import { useFlyStore } from "@/state/fly";
 import { useUiStore } from "@/state/ui";
 import { BrainTab } from "@/components/brain/BrainTab";
@@ -10,6 +10,8 @@ import { useTranslation } from "@/i18n";
 
 export function RightPanel() {
   const phase = useGameStore((s) => s.phase);
+  const selfPlay = useGameStore(isSelfPlay);
+  const mode = useUiStore((s) => s.mode);
   const tab = useUiStore((s) => s.panelTab);
   const setTab = useUiStore((s) => s.setPanelTab);
   const status = useFlyStore((s) => s.status);
@@ -18,7 +20,7 @@ export function RightPanel() {
   return (
     <aside className="right-panel">
       <header className="right-panel__header">
-        <h2>{t("panel.title")}</h2>
+        <h2>{t((phase === "lobby" ? mode === "flyVsFly" : selfPlay) ? "panel.titleSelf" : "panel.title")}</h2>
       </header>
       {phase !== "lobby" && (
         <div className="panel-tabs" role="tablist">

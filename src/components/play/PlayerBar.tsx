@@ -49,12 +49,13 @@ export function PlayerBar({ side }: { side: PieceColor }) {
   useGameStore((s) => s.fen);
   const levelId = useUiStore((s) => s.level);
   const uiSide = useUiStore((s) => s.side);
+  const mode = useUiStore((s) => s.mode);
   const status = useFlyStore((s) => s.status);
   const level = getFlyLevel(levelId);
   const { t, locale } = useTranslation();
 
-  // Before the game the player sits at the bottom of the board as the chosen colour.
-  const mine = phase === "lobby" ? (uiSide === "b" ? side === "b" : side === "w") : side === myColor;
+  // Before the game the player sits at the bottom of the board as the chosen colour, unless the fly plays both.
+  const mine = phase === "lobby" ? mode === "vsFly" && (uiSide === "b" ? side === "b" : side === "w") : side === myColor;
   const opponent: PieceColor = side === "w" ? "b" : "w";
   // Pieces this side has taken are the opponent's lost pieces.
   const taken = captured[opponent];

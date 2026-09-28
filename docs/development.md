@@ -58,6 +58,8 @@ Alternatively, install Playwright's Chromium with
 - the hint and takeback;
 - the brain views render;
 - post-game review and replay, all three search budgets, and draw claims;
+- fly vs fly: the brain plays both sides, the board stays read-only and
+  pause holds the game;
 - WebGPU agrees with the CPU on the full connectome within numeric tolerances,
   when a usable hardware adapter is available. The report marks this check as
   skipped if WebGPU cannot start.

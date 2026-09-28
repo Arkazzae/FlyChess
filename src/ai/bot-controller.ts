@@ -19,6 +19,18 @@ export interface BotMoveDecision {
   selectedEvaluation: number | null;
 }
 
+/** Opening half-moves the fly samples when it plays itself; later moves, and every move against a player, are its best. */
+export const SELF_PLAY_SAMPLED_PLIES = 8;
+
+/**
+ * Against a player the fly always picks its most-visited move (temperature 0, the rated setting).
+ * Playing itself that would repeat the same game every time, so it samples its opening moves in
+ * proportion to their search visits: only moves the search actually looked at can be chosen.
+ */
+export function getFlyTemperature(selfPlay: boolean, halfMoves: number): number {
+  return selfPlay && halfMoves < SELF_PLAY_SAMPLED_PLIES ? 1 : 0;
+}
+
 /** Thinking time for the Fly: generous without a clock, a slice of the remaining time with one. */
 export function getFlyThinkingBudget(remainingMs: number | null, halfMoves: number): number {
   if (remainingMs === null) return halfMoves < 6 ? 1800 : 3500;
@@ -29,6 +41,7 @@ export class BotController {
   private bot: BotDefinition | null = null;
   private initialized = false;
   private level: FlyLevelId = "thinker";
+  private selfPlay = false;
 
   setLevel(level: FlyLevelId): void {
     this.level = level;
@@ -42,10 +55,12 @@ export class BotController {
     this.initialized = true;
   }
 
-  startGame(botId: string, _color: PieceColor): void {
+  /** `color` is the side the bot plays; null when it plays both. */
+  startGame(botId: string, color: PieceColor | null): void {
     const bot = getBot(botId);
     if (!bot) throw new Error(`Unknown bot: ${botId}`);
     this.bot = bot;
+    this.selfPlay = color === null;
   }
 
   /**
@@ -68,10 +83,9 @@ export class BotController {
     const startedAt = performance.now();
     const level = getFlyLevel(this.level);
     const budgetMs = getFlyThinkingBudget(remainingMs, halfMoves);
-    // Zero temperature selects by visit count and prior throughout the game.
     const { decision } = await getFlyEngine().think(fen, {
       ...level.plan,
-      temperature: 0,
+      temperature: getFlyTemperature(this.selfPlay, halfMoves),
       budgetMs: remainingMs === null ? undefined : budgetMs,
       seen,
     });

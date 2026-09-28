@@ -16,7 +16,9 @@ export type ChatEvent =
   | "brilliantMove"
   | "win"
   | "loss"
-  | "idle";
+  | "idle"
+  | "mirror"
+  | "mirrorEnd";
 
 export interface ChatMessage {
   text: string;

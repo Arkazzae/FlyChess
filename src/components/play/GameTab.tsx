@@ -1,5 +1,5 @@
 import { FlyMascot } from "@/components/FlyMascot";
-import { useGameStore } from "@/state/game";
+import { isSelfPlay, useGameStore } from "@/state/game";
 import { useChatStore } from "@/state/chat";
 import { useSettingsStore } from "@/state/settings";
 import { useFlyStore } from "@/state/fly";
@@ -43,6 +43,9 @@ export function GameTab() {
   const setViewPly = useGameStore((s) => s.setViewPly);
   const takeback = useGameStore((s) => s.takeback);
   const flipBoard = useGameStore((s) => s.flipBoard);
+  const selfPlay = useGameStore(isSelfPlay);
+  const paused = useGameStore((s) => s.paused);
+  const setPaused = useGameStore((s) => s.setPaused);
   const log = useChatStore((s) => s.log);
   const flyChat = useSettingsStore((s) => s.flyChat);
   const hintLoading = useUiStore((s) => s.hintLoading);
@@ -78,7 +81,7 @@ export function GameTab() {
       {phase === "ended" && result && (
         <div className="result-row">
           <strong>{result.winner === null ? "½–½" : result.winner === "w" ? "1–0" : "0–1"}</strong>
-          <span>{result.winner === null ? t("game.draw") : result.winner === myColor ? t("game.youWon") : t("game.flyWon")} {reasonText(result.reason)}</span>
+          <span>{result.winner === null ? t("game.draw") : selfPlay ? t(result.winner === "w" ? "game.whiteWon" : "game.blackWon") : result.winner === myColor ? t("game.youWon") : t("game.flyWon")} {reasonText(result.reason)}</span>
         </div>
       )}
       <div className="game-tab__controls">
@@ -87,6 +90,13 @@ export function GameTab() {
             <button type="button" className="btn btn--wide" onClick={backToLobby}>{t("game.newGame")}</button>
             <button type="button" className="btn btn--wide" onClick={() => { useUiStore.getState().setPanelTab("review"); setViewPly(0); }}>{t("panel.review")}</button>
             <button type="button" className="btn btn--green btn--wide" onClick={rematch}>{t("game.rematch")}</button>
+          </>
+        ) : selfPlay ? (
+          <>
+            <button type="button" className="btn btn--wide" onClick={backToLobby}>{t("game.newGame")}</button>
+            <button type="button" className={`btn btn--wide${paused ? " btn--green" : ""}`} onClick={() => setPaused(!paused)}>
+              {paused ? `▶ ${t("game.resume")}` : `❚❚ ${t("game.pause")}`}
+            </button>
           </>
         ) : (
           <>

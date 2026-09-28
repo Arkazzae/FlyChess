@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useFlyStore } from "@/state/fly";
-import { brainClock } from "@/brain/clock";
+import { brainClock, sideClocks } from "@/brain/clock";
 import { t } from "@/i18n";
+import type { PieceColor } from "@/engine/types";
 
 function describe(step: number, steps: number, front: Uint8Array | undefined): string {
   if (step <= 0) return t("timeline.rest");
@@ -10,28 +11,29 @@ function describe(step: number, steps: number, front: Uint8Array | undefined): s
   return front ? t("timeline.front", { where: t(`group.${front[step]}`).toLowerCase() }) : t("timeline.spreading");
 }
 
-/** Play, pause and scrub through the 10 propagation steps. */
-export function BrainTimeline() {
-  const trace = useFlyStore((s) => s.trace);
+/** Play, pause and scrub through the 10 propagation steps (of one side's brain with `side`). */
+export function BrainTimeline({ side }: { side?: PieceColor } = {}) {
+  const trace = useFlyStore((s) => (side ? s.sideTraces[side] : s.trace));
+  const clock = side ? sideClocks[side] : brainClock;
   const fillRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(false);
   const steps = trace?.steps ?? 10;
 
-  useEffect(() => brainClock.subscribe((t) => {
-    if (fillRef.current) fillRef.current.style.width = `${(t / brainClock.steps) * 100}%`;
+  useEffect(() => clock.subscribe((t) => {
+    if (fillRef.current) fillRef.current.style.width = `${(t / clock.steps) * 100}%`;
     const rounded = Math.floor(t + 1e-3);
     setStep((previous) => (previous === rounded ? previous : rounded));
-    const isPlaying = brainClock.mode !== "paused";
+    const isPlaying = clock.mode !== "paused";
     setPlaying((previous) => (previous === isPlaying ? previous : isPlaying));
-  }), []);
+  }), [clock]);
 
   const seekFromPointer = (clientX: number) => {
     const track = trackRef.current;
     if (!track || !trace) return;
     const rect = track.getBoundingClientRect();
-    brainClock.seek(((clientX - rect.left) / rect.width) * steps);
+    clock.seek(((clientX - rect.left) / rect.width) * steps);
   };
 
   return (
@@ -41,7 +43,7 @@ export function BrainTimeline() {
           type="button"
           className="brain-timeline__play"
           disabled={!trace}
-          onClick={() => (playing ? brainClock.pause() : brainClock.play())}
+          onClick={() => (playing ? clock.pause() : clock.play())}
           aria-label={playing ? t("timeline.pause") : t("timeline.play")}
         >
           {playing ? "❚❚" : "▶"}
@@ -61,8 +63,8 @@ export function BrainTimeline() {
           }}
           onPointerMove={(e) => { if (e.buttons & 1) seekFromPointer(e.clientX); }}
           onKeyDown={(e) => {
-            if (e.key === "ArrowRight") brainClock.seek(Math.floor(brainClock.t) + 1);
-            if (e.key === "ArrowLeft") brainClock.seek(Math.ceil(brainClock.t) - 1);
+            if (e.key === "ArrowRight") clock.seek(Math.floor(clock.t) + 1);
+            if (e.key === "ArrowLeft") clock.seek(Math.ceil(clock.t) - 1);
           }}
         >
           <div className="brain-timeline__fill" ref={fillRef} />
@@ -73,7 +75,7 @@ export function BrainTimeline() {
         <output className="brain-timeline__step">{t("timeline.step", { step: Math.min(step, steps), steps })}</output>
       </div>
       <p className="brain-timeline__caption">
-        {trace ? describe(step, steps, brainClock.stats?.front) : t("timeline.waiting")}
+        {trace ? describe(step, steps, clock.stats?.front) : t("timeline.waiting")}
       </p>
     </div>
   );

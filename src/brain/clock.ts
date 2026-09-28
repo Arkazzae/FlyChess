@@ -6,9 +6,13 @@
  * While the fly is thinking the recording loops; once it has moved it plays once
  * and holds the final state. Scrubbing pauses it. A single requestAnimationFrame
  * loop runs only while at least one view is mounted.
+ *
+ * `brainClock` follows the fly's latest recording. When the fly plays itself, each
+ * side's brain also has its own clock (`sideClocks`), following that side's last thought.
  */
 
 import { useFlyStore, type FlyTrace } from "@/state/fly";
+import type { PieceColor } from "@/engine/types";
 import { analyseTrace, type TraceStats } from "./stats";
 
 export type PlayMode = "loop" | "once" | "paused";
@@ -17,7 +21,7 @@ type Listener = (t: number, now: number) => void;
 const STEPS_PER_SECOND = 3.2;
 const HOLD_SECONDS = 1.1;
 
-class BrainClock {
+export class BrainClock {
   t = 0;
   mode: PlayMode = "paused";
   trace: FlyTrace | null = null;
@@ -115,11 +119,17 @@ class BrainClock {
 }
 
 export const brainClock = new BrainClock();
+export const sideClocks: Record<PieceColor, BrainClock> = { w: new BrainClock(), b: new BrainClock() };
 
 // Follow the fly: a new recording starts the playback, the end of thinking settles it.
 useFlyStore.subscribe((state, previous) => {
+  const settled = previous.status === "thinking" && state.status !== "thinking";
   if (state.trace !== previous.trace) brainClock.setTrace(state.trace, state.status === "thinking");
-  if (previous.status === "thinking" && state.status !== "thinking") brainClock.settle();
+  if (settled) brainClock.settle();
+  for (const side of ["w", "b"] as const) {
+    if (state.sideTraces[side] !== previous.sideTraces[side]) sideClocks[side].setTrace(state.sideTraces[side], state.status === "thinking");
+    if (settled) sideClocks[side].settle();
+  }
 });
 
 /** Smooth step between recorded frames. */

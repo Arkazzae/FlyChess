@@ -1,8 +1,8 @@
 /**
- * Starting, restarting and ending games against the fly.
+ * Starting, restarting and ending games against the fly, or of the fly against itself.
  */
 
-import { useGameStore } from "@/state/game";
+import { isSelfPlay, useGameStore } from "@/state/game";
 import { useFlyStore } from "@/state/fly";
 import { timeOption, useUiStore } from "@/state/ui";
 import { getFlyLevel } from "@/ai/bots/levels";
@@ -14,10 +14,16 @@ import { resumeAudio } from "@/sounds";
 import type { GameResult, PieceColor } from "@/engine/types";
 import { t } from "@/i18n";
 
-export function startGame(sideOverride?: PieceColor): void {
+/**
+ * Start a game with the choices from the bot screen. `sideOverride` is the player's colour for a
+ * rematch; null means the fly plays both sides and the player watches.
+ */
+export function startGame(sideOverride?: PieceColor | null): void {
   resumeAudio();
   const ui = useUiStore.getState();
-  const side: PieceColor = sideOverride ?? (ui.side === "random" ? (Math.random() < 0.5 ? "w" : "b") : ui.side);
+  const side: PieceColor | null = sideOverride !== undefined ? sideOverride
+    : ui.mode === "flyVsFly" ? null
+    : ui.side === "random" ? (Math.random() < 0.5 ? "w" : "b") : ui.side;
   const level = getFlyLevel(ui.level);
   // The fly's first thought waits for this brain to be in place.
   void getFlyEngine().useModel(level.model);
@@ -29,15 +35,15 @@ export function startGame(sideOverride?: PieceColor): void {
   useGameStore.getState().newGame({
     timeControl: timeOption(ui.timeId).tc,
     myColor: side,
-    players: side === "w" ? { w: player, b: fly } : { w: fly, b: player },
+    players: side === null ? { w: fly, b: fly } : side === "w" ? { w: player, b: fly } : { w: fly, b: player },
     botId: "fly",
   });
 }
 
 export function rematch(): void {
   const { myColor } = useGameStore.getState();
-  // Like a rematch on a chess site: colours swap.
-  startGame(myColor === "w" ? "b" : "w");
+  // Like a rematch on a chess site: colours swap. The fly playing itself just plays again.
+  startGame(myColor === null ? null : myColor === "w" ? "b" : "w");
 }
 
 export function backToLobby(): void {
@@ -50,7 +56,7 @@ export function finishGame(result: GameResult): void {
   if (state.phase !== "playing") return;
   state.setResult(result);
   const bot = getBot("fly");
-  if (bot && result.winner) triggerChat(result.winner === state.myColor ? "loss" : "win", bot);
+  if (bot && result.winner) triggerChat(isSelfPlay(state) ? "mirrorEnd" : result.winner === state.myColor ? "loss" : "win", bot);
 }
 
 export function resign(): void {
@@ -65,11 +71,11 @@ export function reasonText(reason: GameResult["reason"]): string {
 }
 
 export function downloadPgn(): void {
-  const { chess, players, result, myColor } = useGameStore.getState();
+  const { chess, players, result, myColor, botId } = useGameStore.getState();
   const level = getFlyLevel(useUiStore.getState().level);
   const date = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
-  chess.setHeader("Event", t("pgn.event"));
+  chess.setHeader("Event", t(isSelfPlay({ botId, myColor }) ? "pgn.eventSelf" : "pgn.event"));
   chess.setHeader("Site", "FlyChess.bzz");
   chess.setHeader("Date", `${date.getFullYear()}.${pad(date.getMonth() + 1)}.${pad(date.getDate())}`);
   chess.setHeader("White", players.w?.username ?? (myColor === "w" ? t("player.you") : level.name));

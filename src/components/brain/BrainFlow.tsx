@@ -1,10 +1,12 @@
 import { useEffect, useRef } from "react";
 import { useFlyStore } from "@/state/fly";
 import { FlowView } from "@/brain/FlowView";
+import { brainClock, sideClocks } from "@/brain/clock";
 import { useTranslation } from "@/i18n";
+import type { PieceColor } from "@/engine/types";
 
-/** Signal flow between brain regions during the recorded thought. */
-export function BrainFlow({ compact = false }: { compact?: boolean }) {
+/** Signal flow between brain regions during the recorded thought (of one side's brain with `side`). */
+export function BrainFlow({ compact = false, side }: { compact?: boolean; side?: PieceColor }) {
   const anatomy = useFlyStore((s) => s.anatomy);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const { t, locale } = useTranslation();
@@ -17,10 +19,10 @@ export function BrainFlow({ compact = false }: { compact?: boolean }) {
     const view = new FlowView(canvas, anatomy.groupNames.map((_, index) => t(`group.${index}`)), counts, {
       board: t("flow.board"), readout: t("flow.readout"), move: t("flow.move"),
       layers: ["input", "sensory", "projection", "integration", "output", "readout"].map((layer) => t(`flow.layer.${layer}`)),
-    });
+    }, side ? sideClocks[side] : brainClock);
     view.compact = compact;
     return () => view.dispose();
-  }, [anatomy, compact, locale, t]);
+  }, [anatomy, compact, locale, t, side]);
 
   return (
     <div className={`brain-flow${compact ? " brain-flow--compact" : ""}`}>

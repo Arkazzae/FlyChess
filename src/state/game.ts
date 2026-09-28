@@ -38,7 +38,7 @@ export interface GameState {
 
   // ── Players ──
   players: { w: PlayerInfo | null; b: PlayerInfo | null };
-  myColor: PieceColor | null; // null = spectator
+  myColor: PieceColor | null; // null = spectator (with a bot: the bot plays both sides)
   botId: string | null;
   onlineGameId: string | null;
 
@@ -64,6 +64,8 @@ export interface GameState {
   evaluation: number | null;
   /** Half-move shown on the board while browsing the move list; null = the live position. */
   viewPly: number | null;
+  /** Watching the fly play itself: no new moves (and no clock) until resumed. */
+  paused: boolean;
 
   // ── Actions ──
   newGame: (opts: {
@@ -95,11 +97,22 @@ export interface GameState {
   /** Take back moves until it is the player's turn again (one full move against the bot). */
   takeback: () => number;
   setViewPly: (ply: number | null) => void;
+  setPaused: (paused: boolean) => void;
   reset: () => void;
 
 }
 
 const DEFAULT_TC: TimeControl = { initial: 0, increment: 0 };
+
+/** A bot game with no human side: the fly plays both colours and the player watches. */
+export function isSelfPlay(state: Pick<GameState, "botId" | "myColor">): boolean {
+  return state.botId !== null && state.myColor === null;
+}
+
+/** Whether the bot makes the moves for this colour. */
+export function botMovesFor(state: Pick<GameState, "botId" | "myColor">, color: PieceColor): boolean {
+  return state.botId !== null && state.myColor !== color;
+}
 
 export const useGameStore = create<GameState>((set, get) => ({
   // ── Initial state ──
@@ -126,6 +139,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   promotionPending: null,
   evaluation: null,
   viewPly: null,
+  paused: false,
 
   // ── Actions ──
 
@@ -155,6 +169,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       promotionPending: null,
       evaluation: null,
       viewPly: null,
+      paused: false,
     });
   },
 
@@ -193,7 +208,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       phase,
       selectedSquare: prevSelected,
     } = get();
-    if (phase !== "playing") return;
+    if (phase !== "playing" || isSelfPlay(get())) return;
 
     if (!square) {
       set({ selectedSquare: null, legalMoves: [] });
@@ -244,7 +259,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   tryMove: (from, to) => {
     const { chess, myColor } = get();
     const turn = ChessEngine.getTurn(chess);
-    if (myColor && turn !== myColor) return null;
+    if (isSelfPlay(get()) || (myColor && turn !== myColor)) return null;
 
     // Check if promotion
     const piece = ChessEngine.getPiece(chess, from);
@@ -390,6 +405,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ viewPly: ply === null || ply >= total ? null : Math.max(0, ply), selectedSquare: null, legalMoves: [] });
   },
 
+  setPaused: (paused) => {
+    const { phase, clock } = get();
+    if (phase !== "playing" || !isSelfPlay(get())) return;
+    // The next bot move starts the clock again.
+    set({ paused, clock: paused ? stopClock(clock) : clock });
+  },
+
   reset: () => {
     set({
       chess: new Chess(),
@@ -414,6 +436,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       promotionPending: null,
       evaluation: null,
       viewPly: null,
+      paused: false,
     });
   },
 }));

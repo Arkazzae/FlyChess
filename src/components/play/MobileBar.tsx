@@ -1,4 +1,4 @@
-import { useGameStore } from "@/state/game";
+import { isSelfPlay, useGameStore } from "@/state/game";
 import { useFlyStore } from "@/state/fly";
 import { useUiStore } from "@/state/ui";
 import { requestHint } from "@/ai/hint";
@@ -17,6 +17,9 @@ export function MobileBar() {
   const setViewPly = useGameStore((s) => s.setViewPly);
   const takeback = useGameStore((s) => s.takeback);
   const flipBoard = useGameStore((s) => s.flipBoard);
+  const selfPlay = useGameStore(isSelfPlay);
+  const paused = useGameStore((s) => s.paused);
+  const setPaused = useGameStore((s) => s.setPaused);
   useGameStore((s) => s.fen);
   const hintLoading = useUiStore((s) => s.hintLoading);
   const setPanelTab = useUiStore((s) => s.setPanelTab);
@@ -57,6 +60,19 @@ export function MobileBar() {
         <button type="button" onClick={backToLobby}>{t("game.newGame")}</button>
         <button type="button" onClick={() => { setViewPly(0); setPanelTab("review"); }}>{t("panel.review")}</button>
         <button type="button" className="is-primary" onClick={rematch}>{t("game.rematch")}</button>
+      </nav>
+    );
+  }
+  if (selfPlay) {
+    // Watching the fly play itself: nothing to resign, take back or hint; the play button pauses it.
+    return (
+      <nav className="mobile-bar" aria-label={t("nav.menu")}>
+        <button type="button" className="mobile-bar__new" onClick={backToLobby} aria-label={t("game.newGame")}>+</button>
+        <button type="button" className="mobile-bar__play" onClick={() => setPaused(!paused)} aria-label={paused ? t("game.resume") : t("game.pause")}>{paused ? "▶" : "❚❚"}</button>
+        <button type="button" onClick={() => show("brain")} aria-label={t("panel.brain")} className={thinking ? "is-live" : ""}><IconBrain size={24} /></button>
+        <button type="button" onClick={flipBoard} aria-label={t("game.flip")}><IconFlip /></button>
+        <button type="button" onClick={() => setViewPly(current - 1)} disabled={current === 0} aria-label={t("game.prev")}><IconChevron dir="left" size={22} /></button>
+        <button type="button" onClick={() => setViewPly(current + 1)} disabled={viewPly === null} aria-label={t("game.next")}><IconChevron dir="right" size={22} /></button>
       </nav>
     );
   }

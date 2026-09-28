@@ -1,5 +1,7 @@
 import { useUiStore } from "@/state/ui";
+import { isSelfPlay, useGameStore } from "@/state/game";
 import { BrainCloud } from "./BrainCloud";
+import { BrainDuel } from "./BrainDuel";
 import { BrainFlow } from "./BrainFlow";
 import { BrainTimeline } from "./BrainTimeline";
 import { FlyThoughts } from "./FlyThoughts";
@@ -7,10 +9,12 @@ import { FlyRetina } from "./FlyRetina";
 import { IconExpand } from "@/components/shell/Icons";
 import { useTranslation } from "@/i18n";
 
-/** Compact brain view for the side panel. */
+/** Compact brain view for the side panel; two brains when the fly plays itself. */
 export function BrainTab() {
   const setView = useUiStore((s) => s.setView);
+  const selfPlay = useGameStore(isSelfPlay);
   const { t } = useTranslation();
+  if (selfPlay) return <BrainDuel />;
   return (
     <div className="brain-tab">
       <div className="brain-tab__cloud">

@@ -24,7 +24,7 @@ describe("saved fly selection", () => {
     ["mysl4", "thinker"],
     ["reflex", "scout"], ["rookie", "scout"], ["planner", "tactician"], ["scribe", "tactician"], ["elder", "thinker"],
   ])("restores %s as %s and persists the English identifier", async (previous, current) => {
-    const settings = { level: previous, side: "b", timeId: "3+2", showThoughts: true, showEval: true };
+    const settings = { mode: "vsFly", level: previous, side: "b", timeId: "3+2", showThoughts: true, showEval: true };
     const storage = mockStorage(JSON.stringify(settings));
     const { useUiStore } = await import("./ui");
 
@@ -40,4 +40,22 @@ describe("saved fly selection", () => {
 
       expect(useUiStore.getState().level).toBe("thinker");
     });
+});
+
+describe("saved play mode", () => {
+  it("restores fly vs fly and persists a change back to playing the fly", async () => {
+    const storage = mockStorage('{"mode":"flyVsFly","level":"scout"}');
+    const { useUiStore } = await import("./ui");
+
+    expect(useUiStore.getState().mode).toBe("flyVsFly");
+    useUiStore.getState().setMode("vsFly");
+    expect(JSON.parse(storage.get(STORAGE_KEY)!).mode).toBe("vsFly");
+  });
+
+  it.each(["{}", '{"mode":"spectate"}', "{broken"])("plays against the fly when no valid mode is saved: %s", async (settings) => {
+    mockStorage(settings);
+    const { useUiStore } = await import("./ui");
+
+    expect(useUiStore.getState().mode).toBe("vsFly");
+  });
 });

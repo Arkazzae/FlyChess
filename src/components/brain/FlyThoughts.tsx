@@ -1,29 +1,38 @@
 import { useFlyStore, type FlyThought } from "@/state/fly";
+import { useGameStore } from "@/state/game";
 import { valueToCentipawns } from "@/ai/fly/planner";
 import { useTranslation } from "@/i18n";
+import type { PieceColor } from "@/engine/types";
 
 const fmt = (value: number) => `${value >= 0 ? "+" : "−"}${Math.abs(value).toFixed(2)}`;
-const pawns = (value: number) => {
+/** A search value as signed pawns, from the side of the fly that thought it. */
+export const pawns = (value: number) => {
   const cp = valueToCentipawns(value) / 100;
   return `${cp >= 0 ? "+" : "−"}${Math.abs(cp).toFixed(1)}`;
 };
 
 const GHOST = [78, 52, 34, 22, 14];
 
-/** What the fly is considering: instinct (policy), imagined value, and the line it expects. */
-export function FlyThoughts({ limit = 6, recorded }: { limit?: number; recorded?: FlyThought }) {
+/**
+ * What the fly is considering: instinct (policy), imagined value, and the line it expects. With
+ * `side`, the brain of the fly playing that colour: live only while it is that side's turn.
+ */
+export function FlyThoughts({ limit = 6, recorded, side }: { limit?: number; recorded?: FlyThought; side?: PieceColor }) {
   const status = useFlyStore((s) => s.status);
-  const thought = useFlyStore((s) => s.thought);
+  const thought = useFlyStore((s) => (side ? s.sideThoughts[side] : s.thought));
   const thinking = useFlyStore((s) => s.thinking);
-  const trace = useFlyStore((s) => s.trace);
+  const trace = useFlyStore((s) => (side ? s.sideTraces[side] : s.trace));
   const backend = useFlyStore((s) => s.backend);
+  const turn = useGameStore((s) => s.fen.split(" ")[1]);
   const { t } = useTranslation();
-  const decision = recorded ? recorded.decision : (status === "thinking" ? thinking?.decision : undefined) ?? thought?.decision;
+  const live = !recorded && status === "thinking" && (!side || turn === side);
+  // The shared view keeps the last thought on screen until the first stage arrives; a side's brain starts empty.
+  const decision = recorded ? recorded.decision : live ? thinking?.decision ?? (side ? undefined : thought?.decision) : thought?.decision;
 
   if (!decision) {
     // A ghost of the list it will become: the same rows, with instinct bars fading down the list.
     return (
-      <div className={`thoughts thoughts--empty${status === "thinking" ? " is-thinking" : ""}`}>
+      <div className={`thoughts thoughts--empty${live ? " is-thinking" : ""}`}>
         <ol className="thoughts__list" aria-hidden="true">
           {GHOST.map((width, index) => (
             <li key={index} style={{ animationDelay: `${index * 0.12}s` }}>
@@ -33,7 +42,7 @@ export function FlyThoughts({ limit = 6, recorded }: { limit?: number; recorded?
             </li>
           ))}
         </ol>
-        <p className="thoughts__hint" role="status">{status === "thinking" ? t("thoughts.looking") : t("thoughts.empty")}</p>
+        <p className="thoughts__hint" role="status">{live ? t("thoughts.looking") : t("thoughts.empty")}</p>
       </div>
     );
   }
@@ -41,7 +50,7 @@ export function FlyThoughts({ limit = 6, recorded }: { limit?: number; recorded?
   return (
     <div className="thoughts">
       <p className="thoughts__status" role="status">
-        {status === "thinking" && !recorded
+        {live
           ? t("thoughts.live", { depth: decision.depth, count: decision.simulations })
           : t("thoughts.done", { count: decision.simulations, depth: decision.depth, ms: Math.round((recorded ?? thought)?.thinkMs ?? 0) })}
       </p>

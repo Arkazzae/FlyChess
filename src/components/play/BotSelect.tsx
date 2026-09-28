@@ -5,9 +5,10 @@ import { FLY_LEVELS, getFlyLevel, type FlyLevelId } from "@/ai/bots/levels";
 import { getFlyEngine } from "@/ai/fly/engine";
 import { useFlyStore } from "@/state/fly";
 import { useSettingsStore } from "@/state/settings";
-import { TIME_OPTIONS, useUiStore, type SideChoice } from "@/state/ui";
+import { TIME_OPTIONS, useUiStore, type PlayMode, type SideChoice } from "@/state/ui";
 import { startGame } from "@/game/session";
 
+const MODES: PlayMode[] = ["vsFly", "flyVsFly"];
 const SIDES: SideChoice[] = ["w", "random", "b"];
 
 function KingIcon({ side }: { side: SideChoice }) {
@@ -22,8 +23,10 @@ function KingIcon({ side }: { side: SideChoice }) {
   return <span className="side-king"><img src={`pieces/${side}k.png`} alt="" /></span>;
 }
 
-/** The pre-game screen: pick the fly, colour and time, then play. */
+/** The pre-game screen: play the fly or watch it play itself, pick its search budget, colour and time. */
 export function BotSelect() {
+  const mode = useUiStore((s) => s.mode);
+  const setMode = useUiStore((s) => s.setMode);
   const levelId = useUiStore((s) => s.level);
   const setLevel = useUiStore((s) => s.setLevel);
   const side = useUiStore((s) => s.side);
@@ -43,8 +46,10 @@ export function BotSelect() {
     setLevel(id);
     void getFlyEngine().useModel(getFlyLevel(id).model);
   };
-  // A new line every time a different fly is picked.
-  const speech = useMemo(() => Math.floor(Math.random() * 3), [level.id]);
+  const selfPlay = mode === "flyVsFly";
+  // A new line every time a different fly or mode is picked.
+  const speech = useMemo(() => Math.floor(Math.random() * 3), [level.id, mode]);
+  const speakers = [...FLY_LEVELS.map((fly) => fly.id), "mirror"];
 
   return (
     <div className="bot-select">
@@ -57,12 +62,22 @@ export function BotSelect() {
           {/* Every line sits invisibly in the same cell, so the bubble keeps the height of the longest one. */}
           {flyChat && (
             <div className="speech speech--stack">
-              <p>{t(`select.speech.${level.id}.${speech}`)}</p>
-              {FLY_LEVELS.flatMap((fly) => [0, 1, 2].map((i) => (
-                <p key={`${fly.id}.${i}`} className="speech__ghost" aria-hidden="true">{t(`select.speech.${fly.id}.${i}`)}</p>
+              <p>{t(`select.speech.${selfPlay ? "mirror" : level.id}.${speech}`)}</p>
+              {speakers.flatMap((speaker) => [0, 1, 2].map((i) => (
+                <p key={`${speaker}.${i}`} className="speech__ghost" aria-hidden="true">{t(`select.speech.${speaker}.${i}`)}</p>
               )))}
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="bot-select__section">
+        <div className="mode-pick" role="radiogroup" aria-label={t("mode.aria")}>
+          {MODES.map((item) => (
+            <button key={item} type="button" role="radio" aria-checked={mode === item} className={mode === item ? "is-selected" : ""} onClick={() => setMode(item)}>
+              {t(`mode.${item}`)}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -88,16 +103,23 @@ export function BotSelect() {
         <p className="bot-select__note">{t("select.ratingNote")}</p>
       </div>
 
-      <div className="bot-select__section">
-        <h3>{t("select.playAs")}</h3>
-        <div className="side-pick" role="radiogroup" aria-label={t("select.colorAria")}>
-          {SIDES.map((item) => (
-            <button key={item} type="button" role="radio" aria-checked={side === item} className={side === item ? "is-selected" : ""} onClick={() => setSide(item)} title={t(`side.${item}`)} aria-label={t(`side.${item}`)}>
-              <KingIcon side={item} />
-            </button>
-          ))}
+      {selfPlay ? (
+        <div className="bot-select__section">
+          <h3>{t("select.selfTitle")}</h3>
+          <p className="bot-select__self">{t("select.selfNote")}</p>
         </div>
-      </div>
+      ) : (
+        <div className="bot-select__section">
+          <h3>{t("select.playAs")}</h3>
+          <div className="side-pick" role="radiogroup" aria-label={t("select.colorAria")}>
+            {SIDES.map((item) => (
+              <button key={item} type="button" role="radio" aria-checked={side === item} className={side === item ? "is-selected" : ""} onClick={() => setSide(item)} title={t(`side.${item}`)} aria-label={t(`side.${item}`)}>
+                <KingIcon side={item} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="bot-select__section bot-select__row">
         <label className="select">
@@ -120,7 +142,7 @@ export function BotSelect() {
 
       <div className="bot-select__footer">
         <button type="button" className="btn-play" onClick={() => startGame()} disabled={status === "error"}>
-          {t("select.play")}
+          {t(selfPlay ? "select.watch" : "select.play")}
         </button>
       </div>
     </div>

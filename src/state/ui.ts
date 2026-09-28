@@ -11,6 +11,8 @@ import type { Square, TimeControl } from "@/engine/types";
 export type View = "play" | "brain";
 export type PanelTab = "game" | "brain" | "review";
 export type SideChoice = "w" | "random" | "b";
+/** Play against the fly, or watch it play both sides. */
+export type PlayMode = "vsFly" | "flyVsFly";
 
 export interface TimeOption {
   id: string;
@@ -28,6 +30,7 @@ export const TIME_OPTIONS: TimeOption[] = [
 ];
 
 interface Saved {
+  mode: PlayMode;
   level: FlyLevelId;
   side: SideChoice;
   timeId: string;
@@ -39,7 +42,7 @@ const KEY = "fly-chess-thinker:ui:v2";
 function load(): Partial<Saved> {
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<Saved> | null;
-    return { ...saved, level: getFlyLevel(saved?.level).id };
+    return { ...saved, mode: saved?.mode === "flyVsFly" ? "flyVsFly" : "vsFly", level: getFlyLevel(saved?.level).id };
   } catch {
     return {};
   }
@@ -61,6 +64,7 @@ interface UiState extends Saved {
   settingsOpen: boolean;
   setView: (view: View) => void;
   setPanelTab: (tab: PanelTab) => void;
+  setMode: (mode: PlayMode) => void;
   setLevel: (level: FlyLevelId) => void;
   setSide: (side: SideChoice) => void;
   setTimeId: (id: string) => void;
@@ -76,12 +80,13 @@ const initial = load();
 
 export const useUiStore = create<UiState>((set, get) => {
   const persist = () => {
-    const { level, side, timeId, showThoughts, showEval } = get();
-    save({ level, side, timeId, showThoughts, showEval });
+    const { mode, level, side, timeId, showThoughts, showEval } = get();
+    save({ mode, level, side, timeId, showThoughts, showEval });
   };
   return {
     view: "play",
     panelTab: "game",
+    mode: initial.mode ?? "vsFly",
     level: initial.level ?? "thinker",
     side: initial.side ?? "w",
     timeId: initial.timeId ?? "none",
@@ -93,6 +98,7 @@ export const useUiStore = create<UiState>((set, get) => {
     settingsOpen: false,
     setView: (view) => set({ view }),
     setPanelTab: (panelTab) => set({ panelTab }),
+    setMode: (mode) => { set({ mode }); persist(); },
     setLevel: (level) => { set({ level }); persist(); },
     setSide: (side) => { set({ side }); persist(); },
     setTimeId: (timeId) => { set({ timeId }); persist(); },

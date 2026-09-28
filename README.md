@@ -13,7 +13,8 @@ activity from its eyes through its brain, and you see it happen.
 ## Play
 
 Open **[fly-chess-thinker.vercel.app](https://fly-chess-thinker.vercel.app/)**,
-pick a fly and press **Play**.
+pick a fly and press **Play**. Or switch to **Fly vs fly** and watch one brain
+play both sides; you can pause it to look at what it is thinking.
 
 The first visit downloads the fly's brain (about 51 MB), and then everything
 runs in your browser. It works best on a computer with a recent Chrome, Edge or

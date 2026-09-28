@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useFlyStore } from "@/state/fly";
 import { CloudView, GROUP_COLORS } from "@/brain/CloudView";
+import { brainClock, sideClocks } from "@/brain/clock";
 import { useTranslation } from "@/i18n";
+import type { PieceColor } from "@/engine/types";
 
-/** The 3-D connectome, animated by the recorded thought. */
-export function BrainCloud({ large = false }: { large?: boolean }) {
+/**
+ * The 3-D connectome, animated by the recorded thought: the fly's latest one, or with `side` the
+ * last one of the fly playing that colour. `compact` leaves out the legend and reset button.
+ */
+export function BrainCloud({ large = false, side, compact = false }: { large?: boolean; side?: PieceColor; compact?: boolean }) {
   const anatomy = useFlyStore((s) => s.anatomy);
   const roles = useFlyStore((s) => s.roles);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -18,7 +23,10 @@ export function BrainCloud({ large = false }: { large?: boolean }) {
     const canvas = canvasRef.current;
     if (!canvas || !anatomy) return;
     try {
-      viewRef.current = new CloudView(canvas, anatomy, roles, () => useFlyStore.getState().activity);
+      // The resting activity belongs to whichever side thought last, so a side's brain waits for its own recording.
+      viewRef.current = side
+        ? new CloudView(canvas, anatomy, roles, () => null, sideClocks[side])
+        : new CloudView(canvas, anatomy, roles, () => useFlyStore.getState().activity, brainClock);
       setFailed(null);
     } catch (error) {
       setFailed(error instanceof Error ? error.message : String(error));
@@ -27,7 +35,7 @@ export function BrainCloud({ large = false }: { large?: boolean }) {
       viewRef.current?.dispose();
       viewRef.current = null;
     };
-  }, [anatomy, roles]);
+  }, [anatomy, roles, side]);
 
   useEffect(() => {
     if (viewRef.current) viewRef.current.options = { ...viewRef.current.options, roles: showRoles, focus };
@@ -38,7 +46,7 @@ export function BrainCloud({ large = false }: { large?: boolean }) {
       <canvas ref={canvasRef} tabIndex={0} aria-label={t("cloud.aria")} />
       {!anatomy && <div className="brain-cloud__empty">{t("cloud.loading")}</div>}
       {failed && <div className="brain-cloud__empty">{t("cloud.webgl", { error: failed })}</div>}
-      {anatomy && (
+      {anatomy && !compact && (
         <div className="brain-cloud__legend">
           {large && anatomy.groupNames.map((_, index) => t(`group.${index}`)).map((name, index) => (
             <button
@@ -58,7 +66,9 @@ export function BrainCloud({ large = false }: { large?: boolean }) {
           </button>
         </div>
       )}
-      <button type="button" className="brain-cloud__reset" onClick={() => viewRef.current?.resetView()} title={t("cloud.reset")} aria-label={t("cloud.reset")}>⟲</button>
+      {!compact && (
+        <button type="button" className="brain-cloud__reset" onClick={() => viewRef.current?.resetView()} title={t("cloud.reset")} aria-label={t("cloud.reset")}>⟲</button>
+      )}
     </div>
   );
 }

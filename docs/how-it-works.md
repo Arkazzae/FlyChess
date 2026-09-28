@@ -67,6 +67,12 @@ threefold claims and fifty-move claims use exact rules. A second occurrence
 alone is not scored as a draw. The final choice favours visit count, then prior;
 there is no opening-book or Stockfish move fallback.
 
+When the fly plays itself (**Fly vs fly**), both sides use the selected search
+budget. Its first eight half-moves are sampled in proportion to visit count
+(temperature 1), so only moves the search visited can be played and no two
+games are the same. After that, and in every game against a player, the choice
+is the deterministic one above.
+
 ## Browser and brain view
 
 The browser downloads about **51.3 MB** of compressed graph and FP32 weights,

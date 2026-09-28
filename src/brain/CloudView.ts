@@ -9,7 +9,7 @@
 
 import { ROLE_READOUT, ROLE_VISUAL } from "@/ai/fly/brain";
 import type { FlyAnatomy } from "@/state/fly";
-import { brainClock, frameBlend } from "./clock";
+import { brainClock, frameBlend, type BrainClock } from "./clock";
 
 export const GROUP_COLORS = ["#4fc3d9", "#6f8cff", "#b48cff", "#ff8a65", "#e6c35c", "#7fd67a"];
 
@@ -106,7 +106,13 @@ export class CloudView {
   private unsubscribe: () => void;
   options: CloudOptions = { roles: true, focus: -1, autoRotate: true };
 
-  constructor(readonly canvas: HTMLCanvasElement, anatomy: FlyAnatomy, roles: Uint8Array | null, private readonly fallback: () => Float32Array | null) {
+  constructor(
+    readonly canvas: HTMLCanvasElement,
+    anatomy: FlyAnatomy,
+    roles: Uint8Array | null,
+    private readonly fallback: () => Float32Array | null,
+    private readonly clock: BrainClock = brainClock,
+  ) {
     const gl = canvas.getContext("webgl", { alpha: false, antialias: false, powerPreference: "high-performance", preserveDrawingBuffer: true });
     if (!gl) throw new Error("WebGL is not available.");
     this.gl = gl;
@@ -182,7 +188,7 @@ export class CloudView {
       if (e.key === "Home") { this.yaw = -0.5; this.pitch = 0.12; this.zoom = 0.85; }
       this.touchedAt = performance.now();
     }, options);
-    this.unsubscribe = brainClock.subscribe((t, now) => this.draw(t, now));
+    this.unsubscribe = clock.subscribe((t, now) => this.draw(t, now));
   }
 
   private upload(name: "actA" | "actB", data: Float32Array): void {
@@ -199,19 +205,19 @@ export class CloudView {
     const shot = CloudView.director?.();
     if (shot) ({ yaw: this.yaw, pitch: this.pitch, zoom: this.zoom, t } = shot);
 
-    const trace = brainClock.trace;
+    const trace = this.clock.trace;
     const n = this.count;
     let mixT = 1;
     let norm = 0.25;
     if (trace && trace.frames.length === (trace.steps + 1) * n) {
       const { k, f } = frameBlend(t, trace.steps);
       mixT = f;
-      if (this.uploaded.version !== brainClock.version || this.uploaded.k !== k) {
+      if (this.uploaded.version !== this.clock.version || this.uploaded.k !== k) {
         this.upload("actA", trace.frames.subarray(k * n, (k + 1) * n));
         this.upload("actB", trace.frames.subarray((k + 1) * n, (k + 2) * n));
-        this.uploaded = { version: brainClock.version, k, fallback: null };
+        this.uploaded = { version: this.clock.version, k, fallback: null };
       }
-      const stats = brainClock.stats;
+      const stats = this.clock.stats;
       if (stats) norm = Math.max(...stats.scale) * 0.9;
     } else {
       const activity = this.fallback();

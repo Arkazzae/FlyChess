@@ -19,6 +19,10 @@ export interface ChatMessages {
   win: string[];
   loss: string[];
   idle: string[];
+  /** Playing itself: said at the start and while the game goes on. */
+  mirror: string[];
+  /** Playing itself: said when one side has won. */
+  mirrorEnd: string[];
 }
 
 export interface BotPalette {

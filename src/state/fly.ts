@@ -5,6 +5,7 @@
 
 import { create } from "zustand";
 import type { FlyDecision } from "@/ai/fly/planner";
+import type { PieceColor } from "@/engine/types";
 
 export type FlyStatus = "idle" | "loading" | "ready" | "thinking" | "error";
 
@@ -72,6 +73,10 @@ interface FlyState {
   trace: FlyTrace | null;
   /** Every thought of this game, keyed by the position the fly thought about (for the replay). */
   thoughts: Record<string, FlyThought>;
+  /** The last thought of the fly playing each colour (both sides when it plays itself). */
+  sideThoughts: Record<PieceColor, FlyThought | null>;
+  /** The recording behind each colour's last thought; replays of a finished game do not change it. */
+  sideTraces: Record<PieceColor, FlyTrace | null>;
   download: FlyDownload;
   setStatus: (status: FlyStatus, progress?: string) => void;
   setError: (message: string) => void;
@@ -82,7 +87,13 @@ interface FlyState {
   clearThought: () => void;
   setRoles: (roles: Uint8Array) => void;
   setTrace: (trace: FlyTrace) => void;
+  /** The recording of a position the fly is about to think about: also the brain of the side to move. */
+  setThinkingTrace: (trace: FlyTrace) => void;
   setDownload: (download: FlyDownload) => void;
+}
+
+function sideToMove(fen: string): PieceColor {
+  return fen.split(" ")[1] === "b" ? "b" : "w";
 }
 
 export const useFlyStore = create<FlyState>((set) => ({
@@ -97,6 +108,8 @@ export const useFlyStore = create<FlyState>((set) => ({
   roles: null,
   trace: null,
   thoughts: {},
+  sideThoughts: { w: null, b: null },
+  sideTraces: { w: null, b: null },
   download: { stage: "manifest", loaded: 0, total: 0 },
   setStatus: (status, progress = "") => set({ status, progress, error: null }),
   setError: (message) => set({ status: "error", error: message, progress: "" }),
@@ -106,9 +119,14 @@ export const useFlyStore = create<FlyState>((set) => ({
   setThought: (thought, activity) => set((state) => ({
     thought, thinking: null, activity: activity ?? state.activity, status: "ready",
     thoughts: { ...state.thoughts, [thought.fen]: thought },
+    sideThoughts: { ...state.sideThoughts, [sideToMove(thought.fen)]: thought },
   })),
-  clearThought: () => set({ thought: null, thinking: null, activity: null, trace: null, thoughts: {} }),
+  clearThought: () => set({
+    thought: null, thinking: null, activity: null, trace: null, thoughts: {},
+    sideThoughts: { w: null, b: null }, sideTraces: { w: null, b: null },
+  }),
   setRoles: (roles) => set({ roles }),
   setTrace: (trace) => set({ trace }),
+  setThinkingTrace: (trace) => set((state) => ({ trace, sideTraces: { ...state.sideTraces, [sideToMove(trace.fen)]: trace } })),
   setDownload: (download) => set({ download }),
 }));

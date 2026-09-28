@@ -234,6 +234,32 @@ try {
   assert.equal(report.drawClaim?.reason,"threefold");
   report.checks.push("draw: intended-move threefold claim ends the game before another search");
 
+  // --- fly vs fly: the same brain plays both sides; the player only watches ---
+  await page.evaluate(async () => (await import("/src/game/session.ts")).backToLobby());
+  await page.locator(".mode-pick button").nth(1).click();
+  assert.equal(await page.locator(".side-pick button").count(), 0, "no colour to pick when the fly plays both sides");
+  await page.locator(".bot-card").nth(0).click(); // Scout: the quickest game
+  await page.locator(".btn-play").click();
+  await page.locator('[data-square="e2"]').click();
+  assert.equal(await page.evaluate(async () => (await import("/src/state/game.ts")).useGameStore.getState().selectedSquare), null,
+    "the watching player cannot pick up pieces");
+  await page.waitForFunction(() => document.querySelectorAll(".move-table__move").length >= 3, null, { timeout: 120000 });
+  await page.locator(".game-tab__controls button", { hasText: "Pause" }).click();
+  const pausedAt = await moveCount();
+  await page.waitForTimeout(4000);
+  assert.equal(await moveCount(), pausedAt, "no moves while paused");
+  await page.locator(".game-tab__controls button", { hasText: "Resume" }).click();
+  await page.waitForFunction((n) => document.querySelectorAll(".move-table__move").length > n, pausedAt, { timeout: 120000 });
+  report.selfPlay = await page.evaluate(async () => {
+    const { useGameStore } = await import("/src/state/game.ts");
+    const { useFlyStore } = await import("/src/state/fly.ts");
+    const sides = Object.keys(useFlyStore.getState().thoughts).map((fen) => fen.split(" ")[1]);
+    return { moves: useGameStore.getState().moves, thoughtSides: [...new Set(sides)].sort() };
+  });
+  assert.deepEqual(report.selfPlay.thoughtSides, ["b", "w"], "the fly thought for both colours");
+  await shot("9-fly-vs-fly");
+  report.checks.push(`fly vs fly: one brain played both sides (${report.selfPlay.moves.join(" ")}), the board stayed read-only, pause held the game`);
+
   assert.deepEqual(errors, [], "no uncaught page errors");
   report.ok = true;
 } catch (error) {

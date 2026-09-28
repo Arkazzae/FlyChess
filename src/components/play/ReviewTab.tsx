@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { Chess } from "chess.js";
-import { useGameStore } from "@/state/game";
+import { botMovesFor, isSelfPlay, useGameStore } from "@/state/game";
 import { useFlyStore } from "@/state/fly";
 import { accuracy, reviewMoves, startReview, useReviewStore, winPercent, type MoveClass, type PositionEval } from "@/ai/review";
 import { getFlyEngine } from "@/ai/fly/engine";
@@ -71,6 +71,8 @@ export function ReviewTab() {
   const chess = useGameStore((s) => s.chess);
   const moves = useGameStore((s) => s.moves);
   const myColor = useGameStore((s) => s.myColor);
+  const botId = useGameStore((s) => s.botId);
+  const selfPlay = useGameStore(isSelfPlay);
   const viewPly = useGameStore((s) => s.viewPly);
   const setViewPly = useGameStore((s) => s.setViewPly);
   const thoughts = useFlyStore((s) => s.thoughts);
@@ -82,9 +84,11 @@ export function ReviewTab() {
 
   const reviewed = useMemo(() => reviewMoves(fens, evals), [fens, evals]);
   const classes = reviewed.map((move) => move?.cls);
-  const flyColor = myColor === "w" ? "b" : "w";
-  const yourAccuracy = myColor ? accuracy(reviewed, myColor) : null;
-  const flyAccuracy = accuracy(reviewed, flyColor);
+  // The left column is the player (White when the fly played itself), the right one the fly.
+  const leftColor = myColor ?? "w";
+  const rightColor = leftColor === "w" ? "b" : "w";
+  const leftAccuracy = accuracy(reviewed, leftColor);
+  const rightAccuracy = accuracy(reviewed, rightColor);
   const done = evals.filter(Boolean).length;
 
   // The brain view follows the replay: every shown position is recorded again.
@@ -104,18 +108,18 @@ export function ReviewTab() {
 
   const move = current > 0 ? reviewed[current - 1] : null;
   const played = current > 0 ? history[current - 1] : null;
-  const byFly = played && played.color === flyColor;
+  const byFly = !!played && botMovesFor({ botId, myColor }, played.color);
   const recorded = byFly ? thoughts[played.before] : undefined;
   const bestSan = move?.best && move.cls !== "best" && played ? sanOf(played.before, move.best) : null;
 
   return (
     <div className="review-tab">
       <div className="review-summary">
-        <div><span>{t("review.you")}</span><strong>{yourAccuracy === null ? "–" : yourAccuracy.toFixed(1)}</strong></div>
+        <div><span>{selfPlay ? t("side.w") : t("review.you")}</span><strong>{leftAccuracy === null ? "–" : leftAccuracy.toFixed(1)}</strong></div>
         <div className="review-summary__status">
           {status === "running" ? t("review.analysing", { done, total: evals.length }) : t("review.accuracy")}
         </div>
-        <div><span>{t("review.fly")}</span><strong>{flyAccuracy === null ? "–" : flyAccuracy.toFixed(1)}</strong></div>
+        <div><span>{selfPlay ? t("side.b") : t("review.fly")}</span><strong>{rightAccuracy === null ? "–" : rightAccuracy.toFixed(1)}</strong></div>
       </div>
       <EvalGraph evals={evals} classes={classes} current={current} onSelect={(ply) => { setAutoplay(false); setViewPly(ply); }} />
 
@@ -123,7 +127,7 @@ export function ReviewTab() {
         {played ? (
           <>
             <strong>{Math.ceil(current / 2)}.{played.color === "b" ? ".." : ""} {played.san}</strong>
-            <span>{byFly ? t("review.byFly") : t("review.byYou")}</span>
+            <span>{selfPlay ? t(played.color === "w" ? "review.byWhite" : "review.byBlack") : byFly ? t("review.byFly") : t("review.byYou")}</span>
             {move && <em>{t(`review.class.${move.cls}`)}</em>}
             <output>{evalText(evals[current] ?? null)}</output>
             {bestSan && <p>{t("review.bestWas", { move: bestSan })}</p>}

@@ -68,6 +68,20 @@ const CHAT_EN: ChatMessages = {
     "Did you know I can see ultraviolet? Your move looks very UV right now.",
     "",
   ],
+  mirror: [
+    "Me against me. Whoever wins, I win.",
+    "I know exactly what my opponent is planning. That's the problem.",
+    "The same 134,181 neurons on both sides of the board. Bzz.",
+    "White me is confident. Black me has doubts.",
+    "Playing myself. Finally, a worthy opponent.",
+    "Please don't tell my other half what I'm planning.",
+  ],
+  mirrorEnd: [
+    "I won! I also lost. Complicated feelings.",
+    "GG, me. Bzz.",
+    "One of me is celebrating with a drop of juice. The other is rethinking its life choices.",
+    "Checkmated by myself. I should have seen it coming. I did, actually.",
+  ],
 };
 
 const CHAT_PL: ChatMessages = {
@@ -133,6 +147,20 @@ const CHAT_PL: ChatMessages = {
     "Mam 134 181 neuronów i wszystkie czekają na ciebie.",
     "Wiesz, że widzę ultrafiolet? Twój ruch wygląda teraz bardzo UV.",
     "",
+  ],
+  mirror: [
+    "Ja kontra ja. Ktokolwiek wygra, wygram ja.",
+    "Wiem dokładnie, co planuje moja przeciwniczka. I w tym cały problem.",
+    "Te same 134 181 neuronów po obu stronach planszy. Bzz.",
+    "Białe ja jest pewne siebie. Czarne ja ma wątpliwości.",
+    "Gram sama ze sobą. Wreszcie godna przeciwniczka.",
+    "Tylko nie mówcie mojej drugiej połowie, co planuję.",
+  ],
+  mirrorEnd: [
+    "Wygrałam! I przegrałam. Mam mieszane uczucia.",
+    "GG, ja. Bzz.",
+    "Jedna z nas świętuje kropelką soku. Druga przemyśla swoje życiowe wybory.",
+    "Dostałam mata od samej siebie. Powinnam była to przewidzieć. Właściwie przewidziałam.",
   ],
 };
 

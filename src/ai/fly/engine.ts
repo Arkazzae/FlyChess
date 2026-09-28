@@ -112,7 +112,7 @@ export class FlyEngine {
     } else if (reply.type === "trace") {
       const pending = this.pending.get(reply.id);
       if (pending && !pending.silent) {
-        useFlyStore.getState().setTrace({ id: reply.id, fen: pending.fen, frames: reply.frames, flows: reply.flows, steps: reply.steps, traceMs: reply.traceMs });
+        useFlyStore.getState().setThinkingTrace({ id: reply.id, fen: pending.fen, frames: reply.frames, flows: reply.flows, steps: reply.steps, traceMs: reply.traceMs });
       }
     } else if (reply.type === "progress") {
       if (this.pending.get(reply.id)?.silent === false) useFlyStore.getState().setThinking({ decision: reply.decision, elapsedMs: reply.elapsedMs });

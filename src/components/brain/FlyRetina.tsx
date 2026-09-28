@@ -3,13 +3,17 @@ import { useFlyStore } from "@/state/fly";
 import { useGameStore } from "@/state/game";
 import { useTranslation } from "@/i18n";
 import { encodeFen, SQUARE_FEATURES } from "@/ai/fly/encoding";
+import type { PieceColor } from "@/engine/types";
 
 const GLYPHS = ["♟", "♞", "♝", "♜", "♛", "♚"];
 const CHANNELS = SQUARE_FEATURES;
 
-/** The 64 × 15 stimulus the fly receives: its pieces, the opponent's, and both attack maps (mover frame). */
-export function FlyRetina() {
-  const thought = useFlyStore((s) => s.thought);
+/**
+ * The 64 × 15 stimulus the fly receives: its pieces, the opponent's, and both attack maps (mover frame).
+ * With `side`, what the fly playing that colour saw at its last move.
+ */
+export function FlyRetina({ side }: { side?: PieceColor } = {}) {
+  const thought = useFlyStore((s) => (side ? s.sideThoughts[side] : s.thought));
   const fen = useGameStore((s) => s.fen);
   const { t } = useTranslation();
   // Before the fly has thought about anything, show the board on screen encoded the same way,

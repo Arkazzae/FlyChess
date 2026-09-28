@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { useGameStore } from "./game";
+import { startClock } from "@/engine/clock";
+import { botMovesFor, isSelfPlay, useGameStore } from "./game";
 
 const PLAYERS = {
   w: { userId: "white", username: "White" },
@@ -118,5 +119,62 @@ describe("local two-player game", () => {
     );
 
     expect(useGameStore.getState().capturedPieces).toEqual({ w: [], b: ["p"] });
+  });
+});
+
+describe("the fly playing itself", () => {
+  beforeEach(() => {
+    useGameStore.getState().newGame({
+      timeControl: { initial: 300, increment: 0 },
+      myColor: null,
+      players: PLAYERS,
+      botId: "fly",
+    });
+  });
+
+  it("is a self-play game in which the bot moves for both colours", () => {
+    const state = useGameStore.getState();
+    expect(isSelfPlay(state)).toBe(true);
+    expect(botMovesFor(state, "w")).toBe(true);
+    expect(botMovesFor(state, "b")).toBe(true);
+  });
+
+  it("does not let the watching player move or select pieces", () => {
+    expect(useGameStore.getState().tryMove("e2", "e4")).toBeNull();
+    useGameStore.getState().selectSquare("e2");
+
+    const state = useGameStore.getState();
+    expect(state.moves).toEqual([]);
+    expect(state.selectedSquare).toBeNull();
+  });
+
+  it("stops the clock while paused and resumes without it", () => {
+    const state = useGameStore.getState();
+    useGameStore.setState({ clock: startClock(state.clock, "w") });
+
+    useGameStore.getState().setPaused(true);
+    expect(useGameStore.getState()).toMatchObject({ paused: true, clock: { running: null } });
+
+    // The next bot move starts the clock again.
+    useGameStore.getState().setPaused(false);
+    expect(useGameStore.getState()).toMatchObject({ paused: false, clock: { running: null } });
+  });
+
+  it("starts every new game unpaused", () => {
+    useGameStore.getState().setPaused(true);
+    useGameStore.getState().newGame({ timeControl: { initial: 0, increment: 0 }, myColor: null, players: PLAYERS, botId: "fly" });
+
+    expect(useGameStore.getState().paused).toBe(false);
+  });
+
+  it("only pauses games the fly plays against itself", () => {
+    useGameStore.getState().newGame({ timeControl: { initial: 0, increment: 0 }, myColor: "w", players: PLAYERS, botId: "fly" });
+    useGameStore.getState().setPaused(true);
+
+    const state = useGameStore.getState();
+    expect(state.paused).toBe(false);
+    expect(isSelfPlay(state)).toBe(false);
+    expect(botMovesFor(state, "w")).toBe(false);
+    expect(botMovesFor(state, "b")).toBe(true);
   });
 });
