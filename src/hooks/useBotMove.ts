@@ -3,19 +3,19 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { botMovesFor, isSelfPlay, useGameStore } from "@/state/game";
+import { botMovesFor, isSpectating, useGameStore } from "@/state/game";
 import { BotController, type BotMoveDecision } from "@/ai/bot-controller";
 import { triggerChat, clearChatLog, getChatEventForMove } from "@/ai/bot-chat";
-import { getBot } from "@/ai/bots";
+import { getOpponent } from "@/ai/bots";
 import { getBotMoveDelay } from "@/ai/bot-timing";
+import { CancelledSearch } from "@/ai/stockfish-player";
 import { seenPositions } from "@/ai/fly/planner";
-import { evaluateMaterial } from "@/engine/chess";
 import { getTimeRemaining, isFlagged, isUnlimited, startClock } from "@/engine/clock";
+import { isFlyMirror } from "@/game/session";
 import { playMoveSound } from "@/sounds";
-import { useUiStore } from "@/state/ui";
 import type { Move, PieceColor, Square } from "@/engine/types";
 
-/** Watching the fly play itself without a clock: each move stays on the board at least this long. */
+/** Watching two bots without a clock: each move stays on the board at least this long. */
 const SELF_PLAY_PLY_MS = 1200;
 
 interface ParsedUCIMove {
@@ -43,19 +43,22 @@ export function useBotMove() {
   const [controllerReady, setControllerReady] = useState(false);
 
   const phase = useGameStore((state) => state.phase);
-  const botId = useGameStore((state) => state.botId);
+  const seats = useGameStore((state) => state.seats);
   const myColor = useGameStore((state) => state.myColor);
   const fen = useGameStore((state) => state.fen);
   const moves = useGameStore((state) => state.moves);
   const chess = useGameStore((state) => state.chess);
   const paused = useGameStore((state) => state.paused);
 
-  // The controller lives for the whole game; in self-play the side it moves for changes every turn.
+  // The controller lives for the whole game and moves for whichever bot is to move.
   useEffect(() => {
-    if (phase !== "playing" || !botId) return;
-    const selfPlay = isSelfPlay({ botId, myColor });
+    if (phase !== "playing" || (!seats.w && !seats.b)) return;
+    const spectating = isSpectating({ seats });
+    // The same bot on both sides talks to itself; different bots take turns talking.
+    const mirror = spectating && (isFlyMirror(seats) || seats.w!.id === seats.b!.id);
+    const voices = [seats.w, seats.b].filter((seat) => !!seat).map((seat) => getOpponent(seat!.id));
 
-    const controller = new BotController();
+    const controller = new BotController(seats);
     controllerRef.current = controller;
     setControllerReady(false);
     lastEvalRef.current = null;
@@ -64,26 +67,19 @@ export function useBotMove() {
 
     let cancelled = false;
     controller
-      .init(botId)
+      .init()
       .then(() => {
         if (cancelled) return;
-        controller.startGame(botId, selfPlay ? null : myColor === "w" ? "b" : "w");
-        controller.setLevel(useUiStore.getState().level);
         setControllerReady(true);
-
-        const bot = getBot(botId);
-        if (bot) {
-          triggerChat(selfPlay ? "mirror" : "start", bot);
-        }
+        triggerChat(mirror ? "mirror" : "start", voices[Math.floor(Math.random() * voices.length)]);
       })
       .catch((error) => {
         if (!cancelled) console.error("Bot engine initialization failed:", error);
       });
 
     chatTimerRef.current = setInterval(() => {
-      const bot = getBot(botId);
-      if (bot && useGameStore.getState().phase === "playing") {
-        triggerChat(selfPlay ? "mirror" : "idle", bot);
+      if (useGameStore.getState().phase === "playing") {
+        triggerChat(mirror ? "mirror" : "idle", voices[Math.floor(Math.random() * voices.length)]);
       }
     }, 20000);
 
@@ -95,7 +91,7 @@ export function useBotMove() {
       if (thinkTimerRef.current) clearTimeout(thinkTimerRef.current);
       if (chatTimerRef.current) clearInterval(chatTimerRef.current);
     };
-  }, [phase, botId, myColor]);
+  }, [phase, seats]);
 
   const makeBotMove = useCallback(async () => {
     const controller = controllerRef.current;
@@ -104,7 +100,6 @@ export function useBotMove() {
     if (
       !controllerReady ||
       !controller ||
-      !botId ||
       state.phase !== "playing" ||
       state.result ||
       state.paused ||
@@ -112,7 +107,7 @@ export function useBotMove() {
     ) {
       return;
     }
-    const selfPlay = isSelfPlay(state);
+    const spectating = isSpectating(state);
     const requestedAt = performance.now();
 
     // On every later move the previous player starts the bot's clock. When the
@@ -126,15 +121,16 @@ export function useBotMove() {
 
     try {
       if (decisionRef.current?.fen !== requestedFen) {
+        const history = state.chess.history({ verbose: true });
         decisionRef.current = {
           fen: requestedFen,
-          decision: controller.getMove(
-            requestedFen,
-            state.moves.length,
-            evaluateMaterial(state.chess),
-            isUnlimited(state.timeControl) ? null : getTimeRemaining(state.clock, botColor),
-            seenPositions(state.chess.history({ verbose: true }), requestedFen)
-          ),
+          decision: controller.getMove({
+            fen: requestedFen,
+            history: history.map((move) => `${move.from}${move.to}${move.promotion ?? ""}`),
+            halfMoves: state.moves.length,
+            remainingMs: isUnlimited(state.timeControl) ? null : getTimeRemaining(state.clock, botColor),
+            seen: seenPositions(history, requestedFen),
+          }),
         };
       }
       const decision = await decisionRef.current.decision;
@@ -151,18 +147,16 @@ export function useBotMove() {
         (decision.positionEvaluation ?? 0) * botPerspective;
 
       const latestState = useGameStore.getState();
-      const bot = getBot(botId);
-      let moveDelay = bot
-        ? getBotMoveDelay({
-            bot,
-            baseDelayMs: decision.thinkTime,
-            remainingMs: getTimeRemaining(latestState.clock, botColor),
-            timeControl: latestState.timeControl,
-            halfMoves: latestState.moves.length,
-          })
-        : decision.thinkTime;
-      // A fast brain playing itself would otherwise move faster than anyone can follow.
-      if (selfPlay && isUnlimited(latestState.timeControl)) {
+      const mover = getOpponent(latestState.seats[botColor]?.id);
+      let moveDelay = getBotMoveDelay({
+        bot: mover.bot,
+        baseDelayMs: decision.thinkTime,
+        remainingMs: getTimeRemaining(latestState.clock, botColor),
+        timeControl: latestState.timeControl,
+        halfMoves: latestState.moves.length,
+      });
+      // Two fast bots would otherwise move faster than anyone can follow.
+      if (spectating && isUnlimited(latestState.timeControl)) {
         moveDelay = Math.max(moveDelay, SELF_PLAY_PLY_MS - (performance.now() - requestedAt));
       }
 
@@ -212,34 +206,26 @@ export function useBotMove() {
 
         playMoveSound(result);
 
-        const currentBot = getBot(botId);
-        if (currentBot) {
-          // Blunders and brilliancies are judged from the player's side; playing itself, the fly only enjoys captures.
-          const chatEvent = selfPlay
-            ? result.captured ? "capture" : null
-            : getChatEventForMove({
-                isCapture: !!result.captured,
-                evalDrop,
-                botEvalBefore,
-                botColor,
-              });
-          if (chatEvent) triggerChat(chatEvent, currentBot);
-        }
+        // Blunders and brilliancies are judged from the player's side; between bots, only captures are enjoyed.
+        const chatEvent = spectating
+          ? result.captured ? "capture" : null
+          : getChatEventForMove({
+              isCapture: !!result.captured,
+              evalDrop,
+              botEvalBefore,
+              botColor,
+            });
+        if (chatEvent) triggerChat(chatEvent, mover);
       }, moveDelay);
     } catch (error) {
       if (decisionRef.current?.fen === requestedFen) decisionRef.current = null;
-      console.error("Bot move error:", error);
+      // A search dropped by a new game or a takeback is not an error.
+      if (!(error instanceof CancelledSearch)) console.error("Bot move error:", error);
     }
-  }, [botId, controllerReady, myColor]);
+  }, [controllerReady, myColor]);
 
   useEffect(() => {
-    if (
-      !controllerReady ||
-      phase !== "playing" ||
-      !botId
-    ) {
-      return;
-    }
+    if (!controllerReady || phase !== "playing") return;
 
     const state = useGameStore.getState();
     if (botMovesFor(state, chess.turn()) && !state.result && !paused) {
@@ -251,7 +237,6 @@ export function useBotMove() {
     phase,
     paused,
     myColor,
-    botId,
     makeBotMove,
     chess,
     moves.length,

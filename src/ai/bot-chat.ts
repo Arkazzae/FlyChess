@@ -4,7 +4,8 @@
  * Chat log lives in a Zustand store (state/chat.ts) for React reactivity.
  */
 
-import type { BotDefinition, ChatMessages } from "./bots/types";
+import type { Opponent, OpponentId } from "./bots";
+import type { ChatMessages } from "./bots/types";
 import { useChatStore } from "@/state/chat";
 import { useSettingsStore } from "@/state/settings";
 
@@ -22,6 +23,8 @@ export type ChatEvent =
 
 export interface ChatMessage {
   text: string;
+  /** Who said it, so the bubble can show their portrait. */
+  speaker: OpponentId;
   botName: string;
   avatarUrl: string;
   timestamp: number;
@@ -47,11 +50,12 @@ function pickRandom(pool: string[]): string | null {
   return msg || null;
 }
 
-function addMessage(text: string, bot: BotDefinition): ChatMessage {
+function addMessage(text: string, speaker: Opponent): ChatMessage {
   const msg: ChatMessage = {
     text,
-    botName: bot.name,
-    avatarUrl: bot.avatarUrl,
+    speaker: speaker.id,
+    botName: speaker.name,
+    avatarUrl: speaker.avatarUrl,
     timestamp: Date.now(),
   };
   useChatStore.getState().add(msg);
@@ -63,9 +67,9 @@ function addMessage(text: string, bot: BotDefinition): ChatMessage {
  */
 export function triggerChat(
   event: ChatEvent,
-  bot: BotDefinition
+  speaker: Opponent
 ): ChatMessage | null {
-  // The player can silence the fly in the settings.
+  // The player can silence the bots in the settings.
   if (!useSettingsStore.getState().flyChat) return null;
 
   // Rate-limit idle messages
@@ -74,11 +78,11 @@ export function triggerChat(
     lastIdleTime = Date.now();
   }
 
-  const pool = bot.chat[event as keyof ChatMessages];
+  const pool = speaker.bot.chat[event as keyof ChatMessages];
   const text = pickRandom(pool as string[]);
   if (!text) return null;
 
-  return addMessage(text, bot);
+  return addMessage(text, speaker);
 }
 
 /**

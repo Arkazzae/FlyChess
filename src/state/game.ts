@@ -26,6 +26,7 @@ import {
   type ClockState,
 } from "@/engine/clock";
 import * as ChessEngine from "@/engine/chess";
+import type { Seat } from "@/ai/bots";
 
 export interface GameState {
   // ── Core ──
@@ -38,8 +39,9 @@ export interface GameState {
 
   // ── Players ──
   players: { w: PlayerInfo | null; b: PlayerInfo | null };
-  myColor: PieceColor | null; // null = spectator (with a bot: the bot plays both sides)
-  botId: string | null;
+  /** The bot on each side; null where the player sits. */
+  seats: { w: Seat | null; b: Seat | null };
+  myColor: PieceColor | null; // null = spectator: bots play both sides
   onlineGameId: string | null;
 
   // ── Clock ──
@@ -64,15 +66,15 @@ export interface GameState {
   evaluation: number | null;
   /** Half-move shown on the board while browsing the move list; null = the live position. */
   viewPly: number | null;
-  /** Watching the fly play itself: no new moves (and no clock) until resumed. */
+  /** Watching two bots: no new moves (and no clock) until resumed. */
   paused: boolean;
 
   // ── Actions ──
+  /** The player takes the side without a bot; with bots on both sides the player watches. */
   newGame: (opts: {
     timeControl: TimeControl;
-    myColor: PieceColor | null;
+    seats: { w: Seat | null; b: Seat | null };
     players: { w: PlayerInfo | null; b: PlayerInfo | null };
-    botId?: string | null;
   }) => void;
   loadPosition: (
     fen: string,
@@ -104,14 +106,21 @@ export interface GameState {
 
 const DEFAULT_TC: TimeControl = { initial: 0, increment: 0 };
 
-/** A bot game with no human side: the fly plays both colours and the player watches. */
-export function isSelfPlay(state: Pick<GameState, "botId" | "myColor">): boolean {
-  return state.botId !== null && state.myColor === null;
+const NO_SEATS = { w: null, b: null };
+
+/** A game between two bots: the player only watches. */
+export function isSpectating(state: Pick<GameState, "seats">): boolean {
+  return state.seats.w !== null && state.seats.b !== null;
 }
 
-/** Whether the bot makes the moves for this colour. */
-export function botMovesFor(state: Pick<GameState, "botId" | "myColor">, color: PieceColor): boolean {
-  return state.botId !== null && state.myColor !== color;
+/** Whether a bot makes the moves for this colour. */
+export function botMovesFor(state: Pick<GameState, "seats">, color: PieceColor): boolean {
+  return state.seats[color] !== null;
+}
+
+/** Whether any bot is at the board. */
+export function hasBot(state: Pick<GameState, "seats">): boolean {
+  return state.seats.w !== null || state.seats.b !== null;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -123,8 +132,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   lastMove: null,
   capturedPieces: { w: [], b: [] },
   players: { w: null, b: null },
+  seats: NO_SEATS,
   myColor: null,
-  botId: null,
   onlineGameId: null,
   clock: createClock(DEFAULT_TC),
   timeControl: DEFAULT_TC,
@@ -143,8 +152,10 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   // ── Actions ──
 
-  newGame: ({ timeControl, myColor, players, botId }) => {
+  newGame: ({ timeControl, seats, players }) => {
     const chess = new Chess();
+    // With one bot the player has the other side; with none it is a local game for two, with two the player watches.
+    const myColor: PieceColor | null = (seats.w === null) === (seats.b === null) ? null : seats.w === null ? "w" : "b";
     set({
       chess,
       phase: "playing",
@@ -153,8 +164,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       lastMove: null,
       capturedPieces: { w: [], b: [] },
       players,
+      seats,
       myColor,
-      botId: botId ?? null,
       onlineGameId: null,
       clock: createClock(timeControl),
       timeControl,
@@ -208,7 +219,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       phase,
       selectedSquare: prevSelected,
     } = get();
-    if (phase !== "playing" || isSelfPlay(get())) return;
+    if (phase !== "playing" || isSpectating(get())) return;
 
     if (!square) {
       set({ selectedSquare: null, legalMoves: [] });
@@ -259,7 +270,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   tryMove: (from, to) => {
     const { chess, myColor } = get();
     const turn = ChessEngine.getTurn(chess);
-    if (isSelfPlay(get()) || (myColor && turn !== myColor)) return null;
+    if (isSpectating(get()) || (myColor && turn !== myColor)) return null;
 
     // Check if promotion
     const piece = ChessEngine.getPiece(chess, from);
@@ -407,7 +418,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   setPaused: (paused) => {
     const { phase, clock } = get();
-    if (phase !== "playing" || !isSelfPlay(get())) return;
+    if (phase !== "playing" || !isSpectating(get())) return;
     // The next bot move starts the clock again.
     set({ paused, clock: paused ? stopClock(clock) : clock });
   },
@@ -421,8 +432,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       lastMove: null,
       capturedPieces: { w: [], b: [] },
       players: { w: null, b: null },
+      seats: NO_SEATS,
       myColor: null,
-      botId: null,
       onlineGameId: null,
       clock: createClock(DEFAULT_TC),
       timeControl: DEFAULT_TC,

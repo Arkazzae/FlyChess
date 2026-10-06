@@ -1,49 +1,64 @@
 /**
- * Starting, restarting and ending games against the fly, or of the fly against itself.
+ * Starting, restarting and ending games: the player against a bot, or a match between two bots.
  */
 
-import { isSelfPlay, useGameStore } from "@/state/game";
+import { isSpectating, useGameStore } from "@/state/game";
 import { useFlyStore } from "@/state/fly";
 import { timeOption, useUiStore } from "@/state/ui";
-import { getFlyLevel } from "@/ai/bots/levels";
-import { flyAvatarUrl } from "@/ai/bots/avatars";
 import { getFlyEngine } from "@/ai/fly/engine";
 import { triggerChat } from "@/ai/bot-chat";
-import { getBot } from "@/ai/bots";
+import { getOpponent, seatFor, type Seat } from "@/ai/bots";
 import { resumeAudio } from "@/sounds";
-import type { GameResult, PieceColor } from "@/engine/types";
+import type { GameResult, PieceColor, PlayerInfo } from "@/engine/types";
 import { t } from "@/i18n";
 
-/**
- * Start a game with the choices from the bot screen. `sideOverride` is the player's colour for a
- * rematch; null means the fly plays both sides and the player watches.
- */
-export function startGame(sideOverride?: PieceColor | null): void {
+type Seats = Record<PieceColor, Seat | null>;
+
+/** The seats picked on the bot screen; null is the player's side, rolled now when "random" unless given. */
+export function lobbySeats(playerSide?: PieceColor): Seats {
+  const ui = useUiStore.getState();
+  if (ui.mode === "match") return { w: seatFor(ui.match.w, ui.engine.w), b: seatFor(ui.match.b, ui.engine.b) };
+  const bot = seatFor(ui.opponent, ui.engine.vs);
+  const side: PieceColor = playerSide ?? (ui.side === "random" ? (Math.random() < 0.5 ? "w" : "b") : ui.side);
+  return side === "w" ? { w: null, b: bot } : { w: bot, b: null };
+}
+
+/** Both bots are the fly (at any search budget), so its own mirror lines and two brains apply. */
+export function isFlyMirror(seats: Seats): boolean {
+  return !!seats.w && !!seats.b && getOpponent(seats.w.id).kind === "fly" && getOpponent(seats.b.id).kind === "fly";
+}
+
+/** Whether a fly sits at the board, so its brain has something to show. */
+export function hasFly(seats: Seats): boolean {
+  return [seats.w, seats.b].some((seat) => !!seat && getOpponent(seat.id).kind === "fly");
+}
+
+function playerInfo(seat: Seat | null): PlayerInfo {
+  if (!seat) return { userId: "player", username: t("player.you"), avatarUrl: "avatars/player.svg" };
+  const opponent = getOpponent(seat.id);
+  return { userId: opponent.id, username: opponent.name, avatarUrl: opponent.avatarUrl };
+}
+
+/** Start a game with the choices from the bot screen, or with the given seats for a rematch. */
+export function startGame(seats: Seats = lobbySeats()): void {
   resumeAudio();
   const ui = useUiStore.getState();
-  const side: PieceColor | null = sideOverride !== undefined ? sideOverride
-    : ui.mode === "flyVsFly" ? null
-    : ui.side === "random" ? (Math.random() < 0.5 ? "w" : "b") : ui.side;
-  const level = getFlyLevel(ui.level);
-  // The fly's first thought waits for this brain to be in place.
-  void getFlyEngine().useModel(level.model);
-  const player = { userId: "player", username: t("player.you"), avatarUrl: "avatars/player.svg" };
-  const fly = { userId: "fly", username: level.name, avatarUrl: flyAvatarUrl(level.id) };
+  // The fly's first thought waits for its brain to be in place.
+  if (hasFly(seats)) void getFlyEngine().useModel("droso-1");
   useFlyStore.getState().clearThought();
   ui.setHint(null);
   ui.setPanelTab("game");
   useGameStore.getState().newGame({
     timeControl: timeOption(ui.timeId).tc,
-    myColor: side,
-    players: side === null ? { w: fly, b: fly } : side === "w" ? { w: player, b: fly } : { w: fly, b: player },
-    botId: "fly",
+    seats,
+    players: { w: playerInfo(seats.w), b: playerInfo(seats.b) },
   });
 }
 
 export function rematch(): void {
-  const { myColor } = useGameStore.getState();
-  // Like a rematch on a chess site: colours swap. The fly playing itself just plays again.
-  startGame(myColor === null ? null : myColor === "w" ? "b" : "w");
+  const { seats } = useGameStore.getState();
+  // Like a rematch on a chess site: colours swap, for the player and in a match alike.
+  startGame({ w: seats.b, b: seats.w });
 }
 
 export function backToLobby(): void {
@@ -55,8 +70,13 @@ export function finishGame(result: GameResult): void {
   const state = useGameStore.getState();
   if (state.phase !== "playing") return;
   state.setResult(result);
-  const bot = getBot("fly");
-  if (bot && result.winner) triggerChat(isSelfPlay(state) ? "mirrorEnd" : result.winner === state.myColor ? "loss" : "win", bot);
+  if (!result.winner) return;
+  const { seats } = state;
+  const mirror = seats.w && seats.b && (isFlyMirror(seats) || seats.w.id === seats.b.id);
+  // Against the player the bot speaks either way; in a match the winner does.
+  const speaker = seats[result.winner] ?? seats[result.winner === "w" ? "b" : "w"];
+  if (!speaker) return;
+  triggerChat(mirror ? "mirrorEnd" : seats[result.winner] ? "win" : "loss", getOpponent(speaker.id));
 }
 
 export function resign(): void {
@@ -71,15 +91,20 @@ export function reasonText(reason: GameResult["reason"]): string {
 }
 
 export function downloadPgn(): void {
-  const { chess, players, result, myColor, botId } = useGameStore.getState();
-  const level = getFlyLevel(useUiStore.getState().level);
+  const state = useGameStore.getState();
+  const { chess, players, result, myColor, seats } = state;
   const date = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
-  chess.setHeader("Event", t(isSelfPlay({ botId, myColor }) ? "pgn.eventSelf" : "pgn.event"));
+  const white = players.w?.username ?? t("side.w");
+  const black = players.b?.username ?? t("side.b");
+  const bot = myColor ? seats[myColor === "w" ? "b" : "w"] : null;
+  chess.setHeader("Event", isSpectating(state)
+    ? isFlyMirror(seats) ? t("pgn.eventSelf") : t("pgn.eventMatch", { white, black })
+    : bot && getOpponent(bot.id).kind !== "fly" ? t("pgn.eventBot", { name: getOpponent(bot.id).name }) : t("pgn.event"));
   chess.setHeader("Site", "FlyChess.bzz");
   chess.setHeader("Date", `${date.getFullYear()}.${pad(date.getMonth() + 1)}.${pad(date.getDate())}`);
-  chess.setHeader("White", players.w?.username ?? (myColor === "w" ? t("player.you") : level.name));
-  chess.setHeader("Black", players.b?.username ?? (myColor === "b" ? t("player.you") : level.name));
+  chess.setHeader("White", white);
+  chess.setHeader("Black", black);
   chess.setHeader("Result", result ? (result.winner === "w" ? "1-0" : result.winner === "b" ? "0-1" : "1/2-1/2") : "*");
   const blob = new Blob([chess.pgn() + "\n"], { type: "application/x-chess-pgn" });
   const url = URL.createObjectURL(blob);

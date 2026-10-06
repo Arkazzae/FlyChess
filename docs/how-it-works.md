@@ -87,11 +87,32 @@ it used 64.8 simulations on average, about as many as Thinker, spread from 1 to
 adaptive stop is a browser play setting; the Python player in `training/` and
 `artifacts/` has no equivalent and always completes its budget.
 
-When the fly plays itself (**Fly vs fly**), both sides use the selected search
-budget. Its first eight half-moves are sampled in proportion to visit count
-(temperature 1), so only moves the search visited can be played and no two
-games are the same. After that, and in every game against a player, the choice
-is the deterministic one above.
+When the fly plays in a **Bot vs bot** match (against itself or another bot),
+each fly uses the search budget picked for its side. Its first eight
+half-moves are sampled in proportion to visit count (temperature 1), so only
+moves the search visited can be played and no two games are the same. After
+that, and in every game against a player, the choice is the deterministic one
+above.
+
+## The other opponents
+
+The other opponents do not use the connectome. They run on the bundled
+Stockfish build (`src/ai/stockfish-player.ts`), a 2019 multi-variant
+Stockfish with Skill Level 0–20 but no Elo option:
+
+- **Stockfish** plays with the player's skill level, maximum depth and time
+  per move. With a game clock it spends at most about a 35th of its remaining
+  time on a move (never less than 0.1 s).
+- **Marvin**, **Nelsen** and **Mitzi** ask Stockfish (at full skill) for its
+  best few lines, then choose among them with a softmax over centipawns plus
+  their own taste (`src/ai/persona.ts`). Marvin looks 3 plies deep at 10
+  lines, chooses loosely, loves captures and plays any legal move one time in
+  four. Nelsen looks 6 plies deep and adds a bonus to queen moves that fades
+  over the first 24 half-moves; when no queen move is among Stockfish's lines,
+  he searches the queen moves separately. Mitzi takes one of the three best
+  lines at depth 14, almost always the first.
+
+Their strength labels describe the style. None of them has been rated.
 
 ## Browser and brain view
 

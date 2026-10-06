@@ -1,13 +1,13 @@
-import { FlyMascot } from "@/components/FlyMascot";
-import { isSelfPlay, useGameStore } from "@/state/game";
+import { BotPortrait } from "@/components/BotPortrait";
+import { isSpectating, useGameStore } from "@/state/game";
 import { useChatStore } from "@/state/chat";
 import { useSettingsStore } from "@/state/settings";
 import { useFlyStore } from "@/state/fly";
 import { useUiStore } from "@/state/ui";
-import { getFlyLevel } from "@/ai/bots/levels";
+import { getOpponent, seatSubtitle } from "@/ai/bots";
 import { requestHint } from "@/ai/hint";
 import { useOpeningName } from "@/hooks/useOpeningName";
-import { backToLobby, downloadPgn, reasonText, rematch, resign } from "@/game/session";
+import { backToLobby, downloadPgn, hasFly, reasonText, rematch, resign } from "@/game/session";
 import { useTranslation } from "@/i18n";
 import { MoveTable } from "./MoveTable";
 import { IconBrain, IconBulb, IconChevron, IconDownload, IconFlag, IconFlip, IconGear, IconUndo } from "@/components/shell/Icons";
@@ -43,7 +43,8 @@ export function GameTab() {
   const setViewPly = useGameStore((s) => s.setViewPly);
   const takeback = useGameStore((s) => s.takeback);
   const flipBoard = useGameStore((s) => s.flipBoard);
-  const selfPlay = useGameStore(isSelfPlay);
+  const seats = useGameStore((s) => s.seats);
+  const spectating = useGameStore(isSpectating);
   const paused = useGameStore((s) => s.paused);
   const setPaused = useGameStore((s) => s.setPaused);
   const log = useChatStore((s) => s.log);
@@ -51,11 +52,17 @@ export function GameTab() {
   const hintLoading = useUiStore((s) => s.hintLoading);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const showToast = useUiStore((s) => s.showToast);
-  const level = getFlyLevel(useUiStore((s) => s.level));
   const opening = useOpeningName(fen);
-  const flyThinking = useFlyStore((s) => s.status === "thinking") && phase === "playing";
+  const turn = useGameStore((s) => (s.fen.split(" ")[1] === "b" ? "b" : "w"));
   const { t } = useTranslation();
-  const message = log.at(-1)?.text ?? "Bzz.";
+  const last = log.at(-1);
+  // The bubble belongs to whoever spoke last; before anyone has, to the bot the player faces (White's in a match).
+  const fallback = myColor ? seats[myColor === "w" ? "b" : "w"] : seats.w;
+  const speakerSeat = [seats.w, seats.b].find((seat) => seat && seat.id === last?.speaker) ?? fallback;
+  const speaker = getOpponent(speakerSeat?.id ?? last?.speaker);
+  const speakerThinking = phase === "playing" && !paused && !!speakerSeat && seats[turn] === speakerSeat;
+  const message = last?.text ?? (speaker.kind === "fly" ? "Bzz." : "…");
+  const opponent = myColor ? seats[myColor === "w" ? "b" : "w"] : null;
   const current = viewPly ?? moves.length;
   const myTurn = phase === "playing" && myColor !== null && useGameStore.getState().chess.turn() === myColor;
 
@@ -68,12 +75,12 @@ export function GameTab() {
   return (
     <div className="game-tab">
       <div className="bot-chat">
-        <div className="bot-chat__portrait" style={{ background: level.tint }}><FlyMascot thinking={flyThinking} still variant={level.id} /></div>
+        <div className="bot-chat__portrait" style={{ background: speaker.tint }}><BotPortrait thinking={speakerThinking} still id={speaker.id} /></div>
         {flyChat
-          ? <div className="speech" key={log.at(-1)?.timestamp ?? 0}><p>{message}</p></div>
-          : <div className="bot-hero__name"><strong>{level.name}</strong> <span>{level.short}</span></div>}
+          ? <div className="speech" key={last?.timestamp ?? 0}><p>{message}</p></div>
+          : <div className="bot-hero__name"><strong>{speaker.name}</strong> <span>{speakerSeat ? seatSubtitle(speakerSeat) : speaker.short}</span></div>}
       </div>
-      <BrainStrip />
+      {hasFly(seats) && <BrainStrip />}
       <div className="opening-row">
         <span>{opening ? <><b>{opening.eco}</b> {opening.name}</> : t("game.startPosition")}</span>
       </div>
@@ -81,7 +88,7 @@ export function GameTab() {
       {phase === "ended" && result && (
         <div className="result-row">
           <strong>{result.winner === null ? "½–½" : result.winner === "w" ? "1–0" : "0–1"}</strong>
-          <span>{result.winner === null ? t("game.draw") : selfPlay ? t(result.winner === "w" ? "game.whiteWon" : "game.blackWon") : result.winner === myColor ? t("game.youWon") : t("game.flyWon")} {reasonText(result.reason)}</span>
+          <span>{result.winner === null ? t("game.draw") : spectating ? t(result.winner === "w" ? "game.whiteWon" : "game.blackWon") : result.winner === myColor ? t("game.youWon") : opponent && getOpponent(opponent.id).kind !== "fly" ? t(`bot.${opponent.id}.won`) : t("game.flyWon")} {reasonText(result.reason)}</span>
         </div>
       )}
       <div className="game-tab__controls">
@@ -91,7 +98,7 @@ export function GameTab() {
             <button type="button" className="btn btn--wide" onClick={() => { useUiStore.getState().setPanelTab("review"); setViewPly(0); }}>{t("panel.review")}</button>
             <button type="button" className="btn btn--green btn--wide" onClick={rematch}>{t("game.rematch")}</button>
           </>
-        ) : selfPlay ? (
+        ) : spectating ? (
           <>
             <button type="button" className="btn btn--wide" onClick={backToLobby}>{t("game.newGame")}</button>
             <button type="button" className={`btn btn--wide${paused ? " btn--green" : ""}`} onClick={() => setPaused(!paused)}>

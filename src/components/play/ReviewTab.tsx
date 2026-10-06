@@ -1,6 +1,9 @@
 import { useEffect, useMemo } from "react";
 import { Chess } from "chess.js";
-import { botMovesFor, isSelfPlay, useGameStore } from "@/state/game";
+import { isSpectating, useGameStore } from "@/state/game";
+import { getOpponent } from "@/ai/bots";
+import { hasFly } from "@/game/session";
+import type { PieceColor } from "@/engine/types";
 import { useFlyStore } from "@/state/fly";
 import { accuracy, reviewMoves, startReview, useReviewStore, winPercent, type MoveClass, type PositionEval } from "@/ai/review";
 import { getFlyEngine } from "@/ai/fly/engine";
@@ -65,14 +68,15 @@ function EvalGraph({ evals, classes, current, onSelect }: {
   );
 }
 
-/** Replay of the finished game: Stockfish's verdicts, and the fly's brain on every position. */
+/** Replay of the finished game: Stockfish's verdicts, and the fly's brain on every position when a fly played. */
 export function ReviewTab() {
   const { t } = useTranslation();
   const chess = useGameStore((s) => s.chess);
   const moves = useGameStore((s) => s.moves);
   const myColor = useGameStore((s) => s.myColor);
-  const botId = useGameStore((s) => s.botId);
-  const selfPlay = useGameStore(isSelfPlay);
+  const seats = useGameStore((s) => s.seats);
+  const spectating = useGameStore(isSpectating);
+  const brain = hasFly(seats);
   const viewPly = useGameStore((s) => s.viewPly);
   const setViewPly = useGameStore((s) => s.setViewPly);
   const thoughts = useFlyStore((s) => s.thoughts);
@@ -84,7 +88,7 @@ export function ReviewTab() {
 
   const reviewed = useMemo(() => reviewMoves(fens, evals), [fens, evals]);
   const classes = reviewed.map((move) => move?.cls);
-  // The left column is the player (White when the fly played itself), the right one the fly.
+  // The left column is the player (White in a match between bots), the right one the bot.
   const leftColor = myColor ?? "w";
   const rightColor = leftColor === "w" ? "b" : "w";
   const leftAccuracy = accuracy(reviewed, leftColor);
@@ -94,10 +98,10 @@ export function ReviewTab() {
   // The brain view follows the replay: every shown position is recorded again.
   const shownFen = current === 0 ? history[0]?.before : history[current - 1]?.after;
   useEffect(() => {
-    if (!shownFen) return;
+    if (!shownFen || !brain) return;
     const timer = setTimeout(() => void getFlyEngine().trace(shownFen), 180);
     return () => clearTimeout(timer);
-  }, [shownFen]);
+  }, [shownFen, brain]);
 
   useEffect(() => {
     if (!autoplay) return;
@@ -108,18 +112,25 @@ export function ReviewTab() {
 
   const move = current > 0 ? reviewed[current - 1] : null;
   const played = current > 0 ? history[current - 1] : null;
-  const byFly = !!played && botMovesFor({ botId, myColor }, played.color);
-  const recorded = byFly ? thoughts[played.before] : undefined;
+  const mover = played ? seats[played.color as PieceColor] : null;
+  const recorded = mover && getOpponent(mover.id).kind === "fly" ? thoughts[played!.before] : undefined;
+  /** A side's label: "You", the bot's name, or the colour when the same bot plays both. */
+  const label = (color: PieceColor) => {
+    const seat = seats[color];
+    if (!seat) return t("review.you");
+    if (spectating && seats.w?.id === seats.b?.id) return t(`side.${color}`);
+    return getOpponent(seat.id).kind === "fly" && !spectating ? t("review.fly") : getOpponent(seat.id).name;
+  };
   const bestSan = move?.best && move.cls !== "best" && played ? sanOf(played.before, move.best) : null;
 
   return (
     <div className="review-tab">
       <div className="review-summary">
-        <div><span>{selfPlay ? t("side.w") : t("review.you")}</span><strong>{leftAccuracy === null ? "–" : leftAccuracy.toFixed(1)}</strong></div>
+        <div><span>{label(leftColor)}</span><strong>{leftAccuracy === null ? "–" : leftAccuracy.toFixed(1)}</strong></div>
         <div className="review-summary__status">
           {status === "running" ? t("review.analysing", { done, total: evals.length }) : t("review.accuracy")}
         </div>
-        <div><span>{selfPlay ? t("side.b") : t("review.fly")}</span><strong>{rightAccuracy === null ? "–" : rightAccuracy.toFixed(1)}</strong></div>
+        <div><span>{label(rightColor)}</span><strong>{rightAccuracy === null ? "–" : rightAccuracy.toFixed(1)}</strong></div>
       </div>
       <EvalGraph evals={evals} classes={classes} current={current} onSelect={(ply) => { setAutoplay(false); setViewPly(ply); }} />
 
@@ -127,7 +138,9 @@ export function ReviewTab() {
         {played ? (
           <>
             <strong>{Math.ceil(current / 2)}.{played.color === "b" ? ".." : ""} {played.san}</strong>
-            <span>{selfPlay ? t(played.color === "w" ? "review.byWhite" : "review.byBlack") : byFly ? t("review.byFly") : t("review.byYou")}</span>
+            <span>{spectating ? t(played.color === "w" ? "review.byWhite" : "review.byBlack")
+              : !mover ? t("review.byYou")
+              : getOpponent(mover.id).kind === "fly" ? t("review.byFly") : t("review.byBot", { name: getOpponent(mover.id).name })}</span>
             {move && <em>{t(`review.class.${move.cls}`)}</em>}
             <output>{evalText(evals[current] ?? null)}</output>
             {bestSan && <p>{t("review.bestWas", { move: bestSan })}</p>}
@@ -137,10 +150,12 @@ export function ReviewTab() {
         )}
       </div>
 
-      <div className="review-brain">
-        <BrainCloud />
-        <BrainTimeline />
-      </div>
+      {brain && (
+        <div className="review-brain">
+          <BrainCloud />
+          <BrainTimeline />
+        </div>
+      )}
       {recorded && (
         <section className="panel-section">
           <h3>{t("review.flyThought")}</h3>

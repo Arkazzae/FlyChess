@@ -48,7 +48,7 @@ try {
   });
   assert.equal(report.brainStatus, "droso-1");
   assert.equal(await page.locator(".gen-pick").count(), 0);
-  assert.equal(await page.locator(".bot-card").count(), 4);
+  assert.equal(await page.locator(".bot-card").count(), 8, "four flies, three characters and Stockfish");
   assert.ok(await page.locator(".bot-card img").evaluateAll(images => images.every(img => img.complete && img.naturalWidth > 0)));
   assert.ok(!/fly-v[46]|trained by Arkazzae/.test(await page.locator("body").innerText()));
   assert.equal((await page.locator(".right-panel__header h2").textContent())?.trim(), "Play the Fly", "English by default");
@@ -230,7 +230,7 @@ try {
     const chess = useGameStore.getState().chess;
     chess.reset();
     for (const san of ["Nf3","Nf6","Ng1","Ng8","Nf3","Nf6","Ng1"]) chess.move(san);
-    useGameStore.setState({chess,fen:chess.fen(),phase:"playing",botId:"fly",result:null,moves:chess.history()});
+    useGameStore.setState({chess,fen:chess.fen(),phase:"playing",seats:{w:null,b:{id:"thinker"}},myColor:"w",result:null,moves:chess.history()});
     await new Promise(resolve=>setTimeout(resolve,100));
     return useGameStore.getState().result;
   });
@@ -240,8 +240,11 @@ try {
   // --- fly vs fly: the same brain plays both sides; the player only watches ---
   await page.evaluate(async () => (await import("/src/game/session.ts")).backToLobby());
   await page.locator(".mode-pick button").nth(1).click();
-  assert.equal(await page.locator(".side-pick button").count(), 0, "no colour to pick when the fly plays both sides");
-  await page.locator(".bot-card").nth(0).click(); // Scout: the quickest game
+  assert.equal(await page.locator(".side-pick button").count(), 0, "no colour to pick when two bots play");
+  for (const side of ["w", "b"]) {
+    await page.locator(`.match-seat--${side}`).click();
+    await page.locator(".bot-card").nth(0).click(); // Scout: the quickest game
+  }
   await page.locator(".btn-play").click();
   await page.locator('[data-square="e2"]').click();
   assert.equal(await page.evaluate(async () => (await import("/src/state/game.ts")).useGameStore.getState().selectedSquare), null,
@@ -262,6 +265,26 @@ try {
   assert.deepEqual(report.selfPlay.thoughtSides, ["b", "w"], "the fly thought for both colours");
   await shot("9-fly-vs-fly");
   report.checks.push(`fly vs fly: one brain played both sides (${report.selfPlay.moves.join(" ")}), the board stayed read-only, pause held the game`);
+
+  // --- a match without the fly: a character against a weakened Stockfish, no brain tab ---
+  await page.evaluate(async () => (await import("/src/game/session.ts")).backToLobby());
+  await page.locator(".match-seat--w").click();
+  await page.locator(".bot-card", { hasText: "Marvin" }).click();
+  await page.locator(".match-seat--b").click();
+  await page.locator(".bot-card", { hasText: "Stockfish" }).click();
+  await page.locator(".engine-config input[type=range]").nth(0).fill("0");
+  await page.locator(".engine-config input[type=range]").nth(1).fill("2");
+  await page.locator(".btn-play").click();
+  await page.waitForFunction(() => document.querySelectorAll(".move-table__move").length >= 6, null, { timeout: 60000 });
+  report.engineMatch = await page.evaluate(async () => {
+    const { useGameStore } = await import("/src/state/game.ts");
+    const { seats, moves } = useGameStore.getState();
+    return { seats, moves, tabs: document.querySelectorAll(".panel-tabs button").length };
+  });
+  assert.deepEqual(report.engineMatch.seats, { w: { id: "marvin" }, b: { id: "stockfish", engine: { skill: 0, depth: 2, moveTimeMs: 1000 } } });
+  assert.equal(report.engineMatch.tabs, 1, "no fly brain tab without a fly at the board");
+  await shot("10-marvin-vs-stockfish");
+  report.checks.push(`match: Marvin vs Stockfish (level 0, depth 2) played ${report.engineMatch.moves.join(" ")}`);
 
   assert.deepEqual(errors, [], "no uncaught page errors");
   report.ok = true;

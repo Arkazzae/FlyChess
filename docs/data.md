@@ -51,9 +51,10 @@ PGNs and results are in [benchmarks/droso-1](../benchmarks/droso-1/README.md).
 ## Stockfish
 
 `public/stockfish.js` is the WebAssembly build by Niklas Fiekas (multi-variant
-fork), under GPL v3. It retains its licence header and runs as a separate
-worker for the evaluation bar and post-game review. It does not choose the
-fly's moves. This bundled [stockfish.js runtime](https://github.com/lichess-org/stockfish.js)
+fork), under GPL v3. It retains its licence header and runs in separate
+workers for the evaluation bar, the post-game review and the Stockfish-powered
+opponents (the configurable Stockfish and the three characters). It never
+chooses the fly's moves. This bundled [stockfish.js runtime](https://github.com/lichess-org/stockfish.js)
 is separate from the native Stockfish 19 executable used by the Python data
 collection and benchmark commands; configure that executable through
 `STOCKFISH_EXECUTABLE`.
@@ -61,4 +62,7 @@ collection and benchmark commands; configure that executable through
 ## Illustrations
 
 The fly portraits live in `public/avatars/flies/`, the favicon in `public/`
-and the README banner in `docs/media/`.
+and the README banner in `docs/media/`. The portraits of Marvin, Nelsen, Mitzi
+and the Stockfish robot fish in `public/avatars/bots/` were generated with an
+image model, using two fly portraits as style references. They are original
+characters, not the bots of any chess site.

@@ -1,7 +1,5 @@
 import { getLocale } from "@/i18n";
-import { useUiStore } from "@/state/ui";
 import { flyAvatarUrl } from "./avatars";
-import { getFlyLevel } from "./levels";
 import type { BotDefinition, ChatMessages } from "./types";
 
 const CHAT_EN: ChatMessages = {
@@ -165,38 +163,19 @@ const CHAT_PL: ChatMessages = {
 };
 
 /**
- * The only opponent in Fly Chess. Moves come from a rate model running on the
- * real FlyWire v783 wiring diagram (134,181 neurons), with synaptic gains and
- * the readout trained on Stockfish 19 analysis.
+ * The fly's voice, shared by its four search budgets. Moves come from a rate model running on the
+ * real FlyWire v783 wiring diagram (134,181 neurons), with synaptic gains and the readout trained
+ * on Stockfish 19 analysis.
  */
 export const fly: BotDefinition = {
   id: "fly",
   get name() {
     return getLocale() === "pl" ? "Mucha" : "Fly";
   },
-  title: "DROSO-1",
-  game: "FlyWire v783",
   elo: 1500,
-  personality: "adaptive",
   thinkDelay: 1200,
   get chat() {
     return getLocale() === "pl" ? CHAT_PL : CHAT_EN;
   },
-  get avatarUrl() {
-    return flyAvatarUrl(getFlyLevel(useUiStore.getState().level).id);
-  },
-  description:
-    "A real fruit-fly wiring diagram playing chess. It sees the board through its optic lobes, imagines continuations and judges them with its own current-position value. Taught by Stockfish.",
-  traits: ["Real connectome", "Plans ahead", "Trained by Stockfish"],
-  taglines: {
-    win: "Patience pays. Bzz.",
-    lose: "Next round, a fresh plan.",
-    draw: "A balanced prediction.",
-  },
-  palette: {
-    bgPrimary: "#302e2b",
-    boardLight: "#ebecd0",
-    boardDark: "#739552",
-    accent: "#81b64c",
-  },
+  avatarUrl: flyAvatarUrl("thinker"),
 };

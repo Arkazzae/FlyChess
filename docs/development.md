@@ -61,6 +61,8 @@ Alternatively, install Playwright's Chromium with
   within its ceiling), and draw claims;
 - fly vs fly: the brain plays both sides, the board stays read-only and
   pause holds the game;
+- a match without the fly: Marvin against a weakened Stockfish plays on, with
+  no brain tab;
 - WebGPU agrees with the CPU on the full connectome within numeric tolerances,
   when a usable hardware adapter is available. The report marks this check as
   skipped if WebGPU cannot start.
@@ -75,6 +77,7 @@ Screenshots go to `reports/`.
 | Path | What |
 | --- | --- |
 | `src/ai/fly/` | Connectome and weights loaders, board encoding, the brain (CPU), the WebGPU propagator, the planner, the worker |
+| `src/ai/` | The opponents (`bots/`), the bot controller that moves for either side, the Stockfish player and the characters' move choice (`persona.ts`), hint, review and evaluation bar |
 | `src/brain/` | Brain-view playback clock, recording statistics, the 3D cloud (WebGL), the flow diagram |
 | `src/components/` | App shell and preloader (`shell/`), game screen (`play/`), brain views (`brain/`), board (`Board/`), the fly mascot |
 | `src/game/session.ts` | Starting, rematching and ending games; PGN export |
@@ -124,9 +127,13 @@ them quickly and at the same size.
 The media script records only the application views; it does not touch the
 illustrated README banner, `docs/media/banner-illustrated.png`.
 
-## Fly portraits
+## Portraits
 
 `public/avatars/flies/` holds one portrait per play style: `scout`,
-`tactician` and `thinker`. All three styles use the same DROSO-1 checkpoint
-and differ only in search budget (`src/ai/bots/levels.ts`). The favicon and
-`apple-touch-icon.png` in `public/` use the same illustration.
+`tactician`, `thinker` and `sage`. All four styles use the same DROSO-1
+checkpoint and differ only in search budget (`src/ai/bots/levels.ts`). The
+favicon and `apple-touch-icon.png` in `public/` use the same illustration.
+
+`public/avatars/bots/` holds the Stockfish-powered opponents: `marvin`,
+`nelsen`, `mitzi` and `stockfish`, 512 × 512 WebP in the same style. Their
+background colours match the `tint` values in `src/ai/bots/characters.ts`.

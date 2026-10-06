@@ -13,14 +13,20 @@ Stockfish's analysis, and put the whole thing in your browser.
 ## Play
 
 **[fly-chess-thinker.vercel.app](https://fly-chess-thinker.vercel.app/)**:
-pick a fly, pick a colour, press **Play**.
+pick an opponent, pick a colour, press **Play**.
 
 - **Scout** looks at 8 positions before it moves, **Tactician** at 32,
   **Thinker** at 64. Same brain, different patience.
 - **Sage** decides for itself: one look for an obvious move, up to 256 when it
   can't make up its mind.
-- **Fly vs fly** lets it play against itself. Pause whenever you like and look
-  inside both brains.
+- Not ready for an insect? Three other bugs play from Stockfish's ideas, each
+  in their own style: **Marvin** the beginner beetle, **Nelsen** the wasp who
+  brings his queen out early, and **Mitzi**, a ladybug in knitted mittens who
+  almost never lets go. Or play **Stockfish** itself at the skill level, depth
+  and time per move you choose.
+- **Bot vs bot** pairs any two of them, the fly included, and lets you watch.
+  Pause whenever you like; when a fly plays, look inside its brain (both
+  brains when it plays itself).
 - The first visit downloads the brain (about 51 MB). After that everything
   runs on your own computer, with no account and no backend. Phones work too;
   they just think a little slower.
@@ -58,5 +64,5 @@ or train your own is in this repository:
 - [Data and licences](docs/data.md)
 
 Code: [MIT](LICENSE). Connectomes: FlyWire v783, plus MaleCNS v1.0 for the
-[old prototypes](artifacts/legacy/), both CC BY 4.0. The evaluation bar uses
-Stockfish (GPL-3.0).
+[old prototypes](artifacts/legacy/), both CC BY 4.0. The evaluation bar, the
+game review and the Stockfish-powered opponents use Stockfish (GPL-3.0).

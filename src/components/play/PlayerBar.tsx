@@ -1,9 +1,9 @@
-import { FlyMascot } from "@/components/FlyMascot";
+import { BotPortrait } from "@/components/BotPortrait";
 import { useTranslation } from "@/i18n";
 import { useGameStore } from "@/state/game";
-import { useFlyStore } from "@/state/fly";
 import { useUiStore } from "@/state/ui";
-import { getFlyLevel } from "@/ai/bots/levels";
+import { getOpponent, seatSubtitle, type Seat } from "@/ai/bots";
+import { lobbySeats } from "@/game/session";
 import { Clock } from "@/components/Clock";
 import type { PieceColor, PieceType } from "@/engine/types";
 
@@ -42,37 +42,39 @@ function Flag({ locale, title }: { locale: string; title: string }) {
 }
 
 export function PlayerBar({ side }: { side: PieceColor }) {
-  const myColor = useGameStore((s) => s.myColor);
   const phase = useGameStore((s) => s.phase);
+  const gameSeats = useGameStore((s) => s.seats);
+  const paused = useGameStore((s) => s.paused);
   const captured = useGameStore((s) => s.capturedPieces);
   const chess = useGameStore((s) => s.chess);
   useGameStore((s) => s.fen);
-  const levelId = useUiStore((s) => s.level);
+  // Before the game the bars preview the choices on the bot screen (a random colour shows as White).
+  useUiStore((s) => s.mode);
+  useUiStore((s) => s.opponent);
+  useUiStore((s) => s.match);
+  useUiStore((s) => s.engine);
   const uiSide = useUiStore((s) => s.side);
-  const mode = useUiStore((s) => s.mode);
-  const status = useFlyStore((s) => s.status);
-  const level = getFlyLevel(levelId);
   const { t, locale } = useTranslation();
-
-  // Before the game the player sits at the bottom of the board as the chosen colour, unless the fly plays both.
-  const mine = phase === "lobby" ? mode === "vsFly" && (uiSide === "b" ? side === "b" : side === "w") : side === myColor;
+  const seat: Seat | null = phase === "lobby" ? lobbySeats(uiSide === "random" ? "w" : uiSide)[side] : gameSeats[side];
+  const bot = seat ? getOpponent(seat.id) : null;
   const opponent: PieceColor = side === "w" ? "b" : "w";
   // Pieces this side has taken are the opponent's lost pieces.
   const taken = captured[opponent];
   let material = 0;
   for (const row of chess.board()) for (const piece of row) if (piece) material += (piece.color === side ? 1 : -1) * VALUE[piece.type as PieceType];
-  const thinking = !mine && phase === "playing" && status === "thinking" && chess.turn() === side;
+  // A bot with the move is thinking (or about to play what it found).
+  const thinking = !!bot && phase === "playing" && !paused && chess.turn() === side;
 
   return (
     <div className={`player-bar${thinking ? " is-thinking" : ""}`}>
-      <div className="player-bar__avatar" style={mine ? undefined : { background: level.tint }}>
-        {mine ? <img src="avatars/player.svg" alt="" /> : <FlyMascot still variant={level.id} />}
+      <div className="player-bar__avatar" style={bot ? { background: bot.tint } : undefined}>
+        {bot ? <BotPortrait still id={bot.id} /> : <img src="avatars/player.svg" alt="" />}
       </div>
       <div className="player-bar__info">
         <div className="player-bar__name">
-          <strong>{mine ? t("player.you") : level.name}</strong>
-          {!mine && <span className="player-bar__rating">DROSO-1</span>}
-          {mine && <Flag locale={locale} title={t("player.country")} />}
+          <strong>{bot ? bot.name : t("player.you")}</strong>
+          {seat && <span className="player-bar__rating">{seatSubtitle(seat)}</span>}
+          {!bot && <Flag locale={locale} title={t("player.country")} />}
           {thinking && <span className="player-bar__thinking">{t("player.thinking")}…</span>}
         </div>
         <div className="player-bar__material">

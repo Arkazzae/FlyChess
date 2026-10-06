@@ -1,6 +1,7 @@
 /**
  * Stockfish (public/stockfish.js, GPL-3.0, WebAssembly) running in its own worker, used only for
- * the evaluation bar. It never plays: the fly's moves come from the connectome alone.
+ * the evaluation bar. The Stockfish opponents play through another worker (stockfish-player.ts);
+ * the fly's moves come from the connectome alone.
  *
  * One search at a time. A new position stops the running search and starts once Stockfish has
  * answered the stop, so a late line can never be attributed to the wrong position.

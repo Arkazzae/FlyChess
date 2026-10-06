@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { isSelfPlay, useGameStore } from "@/state/game";
+import { isSpectating, useGameStore } from "@/state/game";
 import { useUiStore } from "@/state/ui";
 import { Board } from "@/components/Board/Board";
 import { BoardOverlays } from "./BoardOverlays";
@@ -13,7 +13,7 @@ import { MoveStrip } from "./MoveStrip";
 export function PlayPage() {
   const phase = useGameStore((s) => s.phase);
   const flipped = useGameStore((s) => s.flipped);
-  const selfPlay = useGameStore(isSelfPlay);
+  const spectating = useGameStore(isSpectating);
   const mode = useUiStore((s) => s.mode);
   const side = useUiStore((s) => s.side);
   const showEval = useUiStore((s) => s.showEval);
@@ -24,9 +24,9 @@ export function PlayPage() {
     document.querySelector(".app__main")?.scrollTo({ top: 0 });
   }, [phase === "lobby"]);
 
-  // Before the game the board faces the colour the player picked; White when the fly plays itself.
+  // Before the game the board faces the colour the player picked; White when two bots play.
   useEffect(() => {
-    if (phase === "lobby") useGameStore.setState({ flipped: mode === "vsFly" && side === "b" });
+    if (phase === "lobby") useGameStore.setState({ flipped: mode === "vsBot" && side === "b" });
   }, [phase, mode, side]);
 
   const top = flipped ? "w" : "b";
@@ -38,8 +38,8 @@ export function PlayPage() {
         <PlayerBar side={top} />
         <div className="board-area">
           {showEval && <EvalBar />}
-          {/* Watching the fly play itself, the board is for looking only (arrows can still be drawn). */}
-          <Board interactive={phase !== "lobby" && !selfPlay}>
+          {/* Watching two bots, the board is for looking only (arrows can still be drawn). */}
+          <Board interactive={phase !== "lobby" && !spectating}>
             <BoardOverlays />
           </Board>
           <GameOverDialog />

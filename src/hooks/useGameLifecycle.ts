@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useRef } from "react";
-import { useGameStore } from "@/state/game";
+import { hasBot, useGameStore } from "@/state/game";
 import { isFlagged, isUnlimited } from "@/engine/clock";
 import { drawClaim, seenPositions } from "@/ai/fly/planner";
 import { finishGame } from "@/game/session";
@@ -17,14 +17,15 @@ export function useGameLifecycle(): void {
   const warned = useRef(false);
 
   useEffect(() => {
-    const { chess, botId } = useGameStore.getState();
+    const state = useGameStore.getState();
+    const { chess } = state;
     if (phase !== "playing") return;
     if (chess.isCheckmate()) finishGame({ winner: chess.turn() === "w" ? "b" : "w", reason: "checkmate" });
     else if (chess.isStalemate()) finishGame({ winner: null, reason: "stalemate" });
     else if (chess.isInsufficientMaterial()) finishGame({ winner: null, reason: "insufficient" });
     else if (chess.isThreefoldRepetition()) finishGame({ winner: null, reason: "threefold" });
     else if (chess.isDrawByFiftyMoves()) finishGame({ winner: null, reason: "fifty_moves" });
-    else if (botId) {
+    else if (hasBot(state)) {
       // Match the model's claim_draw=True protocol before asking it for a move.
       const reason=drawClaim(chess,seenPositions(chess.history({verbose:true}),chess.fen()));
       if(reason) finishGame({winner:null,reason});

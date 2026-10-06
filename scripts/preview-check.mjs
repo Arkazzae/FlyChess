@@ -39,7 +39,7 @@ try {
   await page.locator(".side-pick button").nth(2).click(); // Black: the fly moves first
   report.checks.push("production bundle: connectome downloaded and verified");
 
-  assert.equal(await page.locator(".bot-card").count(), 4);
+  assert.equal(await page.locator(".bot-card").count(), 8);
   assert.equal(await page.locator(".gen-pick").count(), 0);
   const icon = await page.evaluate(async () => {
     const link = document.querySelector('link[rel="icon"][type="image/png"]');

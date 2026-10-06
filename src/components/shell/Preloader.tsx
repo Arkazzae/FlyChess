@@ -7,11 +7,10 @@ import { useEffect, useRef, useState } from "react";
 import { getFlyEngine } from "@/ai/fly/engine";
 import { useFlyStore } from "@/state/fly";
 import { useUiStore } from "@/state/ui";
-import { FLY_LEVELS, getFlyLevel } from "@/ai/bots/levels";
-import { flyAvatarUrl } from "@/ai/bots/avatars";
+import { getOpponent, OPPONENTS } from "@/ai/bots";
 import { preloadSounds } from "@/sounds";
 import { formatLocale, useTranslation } from "@/i18n";
-import { FlyMascot } from "@/components/FlyMascot";
+import { BotPortrait } from "@/components/BotPortrait";
 
 const PIECES = ["wp", "wn", "wb", "wr", "wq", "wk", "bp", "bn", "bb", "br", "bq", "bk"];
 const FACTS = 10;
@@ -28,12 +27,14 @@ function loadImage(src: string): Promise<void> {
 
 export function Preloader({ onDone }: { onDone: () => void }) {
   const { t } = useTranslation();
-  const level = getFlyLevel(useUiStore((s) => s.level));
+  // The fly the player last picked greets them; the Thinker when the last pick was not a fly.
+  const picked = getOpponent(useUiStore((s) => s.opponent));
+  const mascot = picked.kind === "fly" ? picked.id : "thinker";
   const status = useFlyStore((s) => s.status);
   const error = useFlyStore((s) => s.error);
   const download = useFlyStore((s) => s.download);
   const [assets, setAssets] = useState(0);
-  const [assetsTotal] = useState(PIECES.length + FLY_LEVELS.length + 3);
+  const [assetsTotal] = useState(PIECES.length + OPPONENTS.length + 3);
   const [leaving, setLeaving] = useState(false);
   const [fact, setFact] = useState(0);
   const started = useRef(performance.now());
@@ -41,7 +42,7 @@ export function Preloader({ onDone }: { onDone: () => void }) {
   useEffect(() => {
     const tick = () => setAssets((n) => n + 1);
     for (const piece of PIECES) void loadImage(`pieces/${piece}.png`).then(tick);
-    for (const fly of FLY_LEVELS) void loadImage(flyAvatarUrl(fly.id)).then(tick);
+    for (const opponent of OPPONENTS) void loadImage(opponent.avatarUrl).then(tick);
     void loadImage("avatars/player.svg").then(tick);
     void preloadSounds().then(tick);
     void (document.fonts?.ready ?? Promise.resolve()).then(tick);
@@ -78,7 +79,7 @@ export function Preloader({ onDone }: { onDone: () => void }) {
   return (
     <div className={`preloader${leaving ? " is-leaving" : ""}`} role="status" aria-live="polite">
       <div className="preloader__content">
-        <div className="preloader__fly"><FlyMascot variant={level.id} thinking={!done && status !== "error"} /></div>
+        <div className="preloader__fly"><BotPortrait id={mascot} thinking={!done && status !== "error"} /></div>
         <h1 className="preloader__title">Fly<b>Chess</b></h1>
         <p className="preloader__stage">{stage}</p>
         <div className="preloader__bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}>

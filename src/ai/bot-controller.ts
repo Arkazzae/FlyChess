@@ -1,13 +1,16 @@
 /**
- * Bot controller. There is one opponent and one move source: the trained
- * DROSO-1 FlyWire connectome model in src/ai/fly. If the brain cannot be loaded there
- * is no fallback engine — the caller surfaces the failure instead.
+ * Bot controller: one per game, holding both seats and asking whoever is to move. The fly thinks
+ * with the DROSO-1 connectome in src/ai/fly; the characters and Stockfish search with the
+ * Stockfish player worker. If a brain or engine cannot be loaded there is no substitute: the
+ * caller surfaces the failure instead.
  */
 
-import { getBot, type BotDefinition } from "./bots";
-import { getFlyLevel, type FlyLevelId } from "./bots/levels";
+import { getCharacter, getOpponent, type Seat } from "./bots";
+import { getFlyLevel } from "./bots/levels";
 import { getFlyEngine } from "./fly/engine";
 import { valueToCentipawns } from "./fly/planner";
+import { choosePersonaMove, queenMoves, scoreOf, type Candidate } from "./persona";
+import { stockfishPlayer } from "./stockfish-player";
 import type { PieceColor } from "@/engine/types";
 
 export interface BotMoveDecision {
@@ -19,16 +22,27 @@ export interface BotMoveDecision {
   selectedEvaluation: number | null;
 }
 
-/** Opening half-moves the fly samples when it plays itself; later moves, and every move against a player, are its best. */
+export interface MoveRequest {
+  fen: string;
+  /** The game's moves so far in UCI, from the starting position. */
+  history: string[];
+  halfMoves: number;
+  /** The bot's remaining clock time; null when the game is untimed. */
+  remainingMs: number | null;
+  /** Position counts of the game so far: the fly's memory against repeating itself. */
+  seen?: Record<string, number>;
+}
+
+/** Opening half-moves the fly samples when the player only watches; later moves, and every move against a player, are its best. */
 export const SELF_PLAY_SAMPLED_PLIES = 8;
 
 /**
  * Against a player the fly always picks its most-visited move (temperature 0, the rated setting).
- * Playing itself that would repeat the same game every time, so it samples its opening moves in
- * proportion to their search visits: only moves the search actually looked at can be chosen.
+ * In a game between bots that would repeat the same game every time, so it samples its opening
+ * moves in proportion to their search visits: only moves the search actually looked at can be chosen.
  */
-export function getFlyTemperature(selfPlay: boolean, halfMoves: number): number {
-  return selfPlay && halfMoves < SELF_PLAY_SAMPLED_PLIES ? 1 : 0;
+export function getFlyTemperature(spectating: boolean, halfMoves: number): number {
+  return spectating && halfMoves < SELF_PLAY_SAMPLED_PLIES ? 1 : 0;
 }
 
 /** Thinking time for the Fly: generous without a clock, a slice of the remaining time with one. */
@@ -37,82 +51,108 @@ export function getFlyThinkingBudget(remainingMs: number | null, halfMoves: numb
   return Math.round(Math.max(350, Math.min(5000, remainingMs / 35)));
 }
 
+/** Stockfish's time for a move: its own limit, cut to a slice of the clock when one runs. */
+export function getEngineMoveTime(limitMs: number, remainingMs: number | null): number {
+  if (remainingMs === null) return limitMs;
+  return Math.round(Math.max(100, Math.min(limitMs, remainingMs / 35)));
+}
+
+function sideToMove(fen: string): PieceColor {
+  return fen.split(" ")[1] === "b" ? "b" : "w";
+}
+
 export class BotController {
-  private bot: BotDefinition | null = null;
-  private initialized = false;
-  private level: FlyLevelId = "thinker";
-  private selfPlay = false;
+  private readonly seats: Record<PieceColor, Seat | null>;
+  /** No player at the board: bots on both sides. */
+  private readonly spectating: boolean;
 
-  setLevel(level: FlyLevelId): void {
-    this.level = level;
+  constructor(seats: Record<PieceColor, Seat | null>) {
+    this.seats = seats;
+    this.spectating = !!seats.w && !!seats.b;
   }
 
-  async init(botId?: string): Promise<void> {
-    if (this.initialized) return;
-    const bot = getBot(botId ?? "fly");
-    if (!bot) throw new Error(`Unknown bot: ${botId}`);
-    await getFlyEngine().init();
-    this.initialized = true;
+  private kinds() {
+    return [this.seats.w, this.seats.b].filter((seat): seat is Seat => !!seat).map((seat) => getOpponent(seat.id).kind);
   }
 
-  /** `color` is the side the bot plays; null when it plays both. */
-  startGame(botId: string, color: PieceColor | null): void {
-    const bot = getBot(botId);
-    if (!bot) throw new Error(`Unknown bot: ${botId}`);
-    this.bot = bot;
-    this.selfPlay = color === null;
+  async init(): Promise<void> {
+    const kinds = this.kinds();
+    if (kinds.some((kind) => kind !== "fly")) stockfishPlayer.newGame();
+    if (kinds.includes("fly")) await getFlyEngine().init();
   }
 
-  /**
-   * Complete the selected PUCT budget in untimed games; respect the clock in timed games.
-   */
-  async getMove(
-    fen: string,
-    halfMoves: number,
-    _evalScore = 0,
-    /** Bot's remaining clock time; null when the game is untimed. */
-    remainingMs: number | null = null,
-    /** Position counts of the game so far: the fly's memory against repeating itself. */
-    seen?: Record<string, number>
-  ): Promise<BotMoveDecision> {
-    if (!this.bot || !this.initialized) {
-      throw new Error("Bot controller not initialized");
-    }
-
-    const bot = this.bot;
+  async getMove(request: MoveRequest): Promise<BotMoveDecision> {
+    const seat = this.seats[sideToMove(request.fen)];
+    if (!seat) throw new Error("It is the player's move, not the bot's.");
+    const opponent = getOpponent(seat.id);
     const startedAt = performance.now();
-    const level = getFlyLevel(this.level);
-    const budgetMs = getFlyThinkingBudget(remainingMs, halfMoves);
+    const decision = opponent.kind === "fly" ? await this.flyMove(seat, request)
+      : opponent.kind === "engine" ? await this.engineMove(seat, request)
+      : await this.characterMove(seat, request);
+    const elapsed = performance.now() - startedAt;
+    const delay = request.remainingMs === null ? opponent.bot.thinkDelay : Math.min(opponent.bot.thinkDelay, getFlyThinkingBudget(request.remainingMs, request.halfMoves));
+    // The thinking itself is the pause; only top up when the answer came instantly (forced move, cache, shallow search).
+    return { ...decision, thinkTime: Math.max(60, Math.round(delay * 0.5 - elapsed)) };
+  }
+
+  /** Complete the selected PUCT budget in untimed games; respect the clock in timed games. */
+  private async flyMove(seat: Seat, { fen, halfMoves, remainingMs, seen }: MoveRequest): Promise<Omit<BotMoveDecision, "thinkTime">> {
+    const level = getFlyLevel(seat.id);
     const { decision } = await getFlyEngine().think(fen, {
       ...level.plan,
-      temperature: getFlyTemperature(this.selfPlay, halfMoves),
-      budgetMs: remainingMs === null ? undefined : budgetMs,
+      temperature: getFlyTemperature(this.spectating, halfMoves),
+      budgetMs: remainingMs === null ? undefined : getFlyThinkingBudget(remainingMs, halfMoves),
       seen,
     });
-    const elapsed = performance.now() - startedAt;
-    const toWhite = fen.split(" ")[1] === "w" ? 1 : -1;
+    const toWhite = sideToMove(fen) === "w" ? 1 : -1;
     const chosen = decision.candidates.find((candidate) => candidate.uci === decision.move);
-
     return {
       move: decision.move,
-      // The thinking itself is the pause; only top up when the brain answered instantly (forced move, cache).
-      thinkTime: Math.max(60, Math.round(Math.min(bot.thinkDelay, budgetMs) * 0.5 - elapsed)),
       positionEvaluation: valueToCentipawns(decision.value[0]) * toWhite,
       selectedEvaluation: chosen ? valueToCentipawns(chosen.value) * toWhite : null,
     };
   }
 
-  getBotInfo(): BotDefinition | null {
-    return this.bot;
+  private async engineMove(seat: Seat, { fen, history, remainingMs }: MoveRequest): Promise<Omit<BotMoveDecision, "thinkTime">> {
+    const config = seat.engine!;
+    const result = await stockfishPlayer.search({
+      moves: history, skill: config.skill, depth: config.depth, lines: 1, moveTimeMs: getEngineMoveTime(config.moveTimeMs, remainingMs),
+    });
+    if (!result.best) throw new Error("Stockfish found no move.");
+    const toWhite = sideToMove(fen) === "w" ? 1 : -1;
+    const main = result.lines[0];
+    const chosen = result.lines.find((line) => line.uci === result.best);
+    return {
+      move: result.best,
+      positionEvaluation: main ? scoreOf(main) * toWhite : null,
+      selectedEvaluation: chosen ? scoreOf(chosen) * toWhite : null,
+    };
   }
 
-  stop(): void {
-    // The connectome worker finishes its current thought on its own.
+  private async characterMove(seat: Seat, { fen, history, halfMoves, remainingMs }: MoveRequest): Promise<Omit<BotMoveDecision, "thinkTime">> {
+    const { style } = getCharacter(seat.id)!;
+    const search = { moves: history, skill: 20, depth: style.depth, moveTimeMs: getEngineMoveTime(style.moveTimeMs, remainingMs) };
+    const result = await stockfishPlayer.search({ ...search, lines: style.lines });
+    const candidates: Candidate[] = result.lines.map((line) => ({ uci: line.uci, score: scoreOf(line) }));
+    // Stockfish rarely ranks an early queen sortie among its best lines; a queen lover looks at them anyway.
+    if (style.queenBonus > 0 && halfMoves < style.queenUntilPly) {
+      const queen = queenMoves(fen);
+      if (queen.length && !candidates.some((candidate) => queen.includes(candidate.uci))) {
+        const sortie = await stockfishPlayer.search({ ...search, lines: Math.min(3, queen.length), only: queen });
+        candidates.push(...sortie.lines.map((line) => ({ uci: line.uci, score: scoreOf(line) })));
+      }
+    }
+    const chosen = choosePersonaMove(fen, candidates, style, halfMoves);
+    const toWhite = sideToMove(fen) === "w" ? 1 : -1;
+    return {
+      move: chosen.uci,
+      positionEvaluation: candidates.length ? candidates[0].score! * toWhite : null,
+      selectedEvaluation: chosen.score === null ? null : chosen.score * toWhite,
+    };
   }
 
   destroy(): void {
-    // The fly brain is shared for the whole session (large download); nothing is per game.
-    this.bot = null;
-    this.initialized = false;
+    // The fly brain is shared for the whole session (large download); only queued engine searches are dropped.
+    if (this.kinds().some((kind) => kind !== "fly")) stockfishPlayer.cancel();
   }
 }

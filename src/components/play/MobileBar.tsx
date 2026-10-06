@@ -1,8 +1,8 @@
-import { isSelfPlay, useGameStore } from "@/state/game";
+import { isSpectating, useGameStore } from "@/state/game";
 import { useFlyStore } from "@/state/fly";
 import { useUiStore } from "@/state/ui";
 import { requestHint } from "@/ai/hint";
-import { backToLobby, rematch, resign } from "@/game/session";
+import { backToLobby, hasFly, rematch, resign } from "@/game/session";
 import { useReviewStore } from "@/ai/review";
 import { useTranslation } from "@/i18n";
 import { IconBrain, IconBulb, IconChevron, IconFlag, IconFlip, IconUndo } from "@/components/shell/Icons";
@@ -17,7 +17,8 @@ export function MobileBar() {
   const setViewPly = useGameStore((s) => s.setViewPly);
   const takeback = useGameStore((s) => s.takeback);
   const flipBoard = useGameStore((s) => s.flipBoard);
-  const selfPlay = useGameStore(isSelfPlay);
+  const spectating = useGameStore(isSpectating);
+  const brain = useGameStore((s) => hasFly(s.seats));
   const paused = useGameStore((s) => s.paused);
   const setPaused = useGameStore((s) => s.setPaused);
   useGameStore((s) => s.fen);
@@ -63,13 +64,14 @@ export function MobileBar() {
       </nav>
     );
   }
-  if (selfPlay) {
-    // Watching the fly play itself: nothing to resign, take back or hint; the play button pauses it.
+  const brainButton = brain && <button type="button" onClick={() => show("brain")} aria-label={t("panel.brain")} className={thinking ? "is-live" : ""}><IconBrain size={24} /></button>;
+  if (spectating) {
+    // Watching two bots: nothing to resign, take back or hint; the play button pauses them.
     return (
       <nav className="mobile-bar" aria-label={t("nav.menu")}>
         <button type="button" className="mobile-bar__new" onClick={backToLobby} aria-label={t("game.newGame")}>+</button>
         <button type="button" className="mobile-bar__play" onClick={() => setPaused(!paused)} aria-label={paused ? t("game.resume") : t("game.pause")}>{paused ? "▶" : "❚❚"}</button>
-        <button type="button" onClick={() => show("brain")} aria-label={t("panel.brain")} className={thinking ? "is-live" : ""}><IconBrain size={24} /></button>
+        {brainButton}
         <button type="button" onClick={flipBoard} aria-label={t("game.flip")}><IconFlip /></button>
         <button type="button" onClick={() => setViewPly(current - 1)} disabled={current === 0} aria-label={t("game.prev")}><IconChevron dir="left" size={22} /></button>
         <button type="button" onClick={() => setViewPly(current + 1)} disabled={viewPly === null} aria-label={t("game.next")}><IconChevron dir="right" size={22} /></button>
@@ -81,7 +83,7 @@ export function MobileBar() {
       <button type="button" onClick={resign} aria-label={t("game.resign")}><IconFlag /></button>
       <button type="button" onClick={() => takeback()} disabled={!moves.length} aria-label={t("game.undo")}><IconUndo /></button>
       <button type="button" onClick={() => void requestHint()} disabled={!myTurn || hintLoading} aria-label={t("game.hintShort")} className={hintLoading ? "is-loading" : ""}><IconBulb /></button>
-      <button type="button" onClick={() => show("brain")} aria-label={t("panel.brain")} className={thinking ? "is-live" : ""}><IconBrain size={24} /></button>
+      {brainButton}
       <button type="button" onClick={flipBoard} aria-label={t("game.flip")}><IconFlip /></button>
       <button type="button" onClick={() => setViewPly(current - 1)} disabled={current === 0} aria-label={t("game.prev")}><IconChevron dir="left" size={22} /></button>
       <button type="button" onClick={() => setViewPly(current + 1)} disabled={viewPly === null} aria-label={t("game.next")}><IconChevron dir="right" size={22} /></button>

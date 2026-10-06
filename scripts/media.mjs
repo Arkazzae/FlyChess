@@ -94,7 +94,7 @@ try {
   if (want("gameplay")) {
     const { context, page, mark } = await recorded();
     await page.addInitScript(() => {
-      localStorage.setItem("fly-chess-thinker:ui:v2", JSON.stringify({ level: "thinker", side: "w", timeId: "none", showThoughts: true, showEval: true }));
+      localStorage.setItem("fly-chess-thinker:ui:v2", JSON.stringify({ opponent: "thinker", side: "w", timeId: "none", showThoughts: true, showEval: true }));
     });
     await page.goto(origin);
     await page.locator(".preloader").waitFor({ state: "detached", timeout: 180000 });

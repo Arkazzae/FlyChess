@@ -1,5 +1,6 @@
 import { useUiStore } from "@/state/ui";
-import { isSelfPlay, useGameStore } from "@/state/game";
+import { useGameStore } from "@/state/game";
+import { isFlyMirror } from "@/game/session";
 import { BrainCloud } from "./BrainCloud";
 import { BrainDuel } from "./BrainDuel";
 import { BrainFlow } from "./BrainFlow";
@@ -12,9 +13,9 @@ import { useTranslation } from "@/i18n";
 /** Compact brain view for the side panel; two brains when the fly plays itself. */
 export function BrainTab() {
   const setView = useUiStore((s) => s.setView);
-  const selfPlay = useGameStore(isSelfPlay);
+  const mirror = useGameStore((s) => isFlyMirror(s.seats));
   const { t } = useTranslation();
-  if (selfPlay) return <BrainDuel />;
+  if (mirror) return <BrainDuel />;
   return (
     <div className="brain-tab">
       <div className="brain-tab__cloud">

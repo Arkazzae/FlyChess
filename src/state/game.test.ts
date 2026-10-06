@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { startClock } from "@/engine/clock";
-import { botMovesFor, isSelfPlay, useGameStore } from "./game";
+import { botMovesFor, isSpectating, useGameStore } from "./game";
 
 const PLAYERS = {
   w: { userId: "white", username: "White" },
@@ -11,7 +11,7 @@ describe("game defaults", () => {
   it("resets to an unlimited game", () => {
     useGameStore.getState().newGame({
       timeControl: { initial: 300, increment: 0 },
-      myColor: null,
+      seats: { w: null, b: null },
       players: PLAYERS,
     });
 
@@ -26,9 +26,8 @@ describe("premove selection", () => {
   beforeEach(() => {
     useGameStore.getState().newGame({
       timeControl: { initial: 300, increment: 0 },
-      myColor: "b",
+      seats: { w: { id: "marvin" }, b: null },
       players: PLAYERS,
-      botId: "mario",
     });
   });
 
@@ -81,9 +80,8 @@ describe("local two-player game", () => {
   beforeEach(() => {
     useGameStore.getState().newGame({
       timeControl: { initial: 300, increment: 0 },
-      myColor: null,
+      seats: { w: null, b: null },
       players: PLAYERS,
-      botId: null,
     });
   });
 
@@ -92,7 +90,7 @@ describe("local two-player game", () => {
     expect(useGameStore.getState().tryMove("e7", "e5")).toMatchObject({ san: "e5" });
 
     const state = useGameStore.getState();
-    expect(state.botId).toBeNull();
+    expect(state.seats).toEqual({ w: null, b: null });
     expect(state.myColor).toBeNull();
     expect(state.moves).toEqual(["e4", "e5"]);
     expect(state.chess.turn()).toBe("w");
@@ -122,19 +120,22 @@ describe("local two-player game", () => {
   });
 });
 
-describe("the fly playing itself", () => {
+const MATCH = { w: { id: "thinker" as const }, b: { id: "stockfish" as const, engine: { skill: 5, depth: 6, moveTimeMs: 500 } } };
+
+describe("a game between two bots", () => {
   beforeEach(() => {
     useGameStore.getState().newGame({
       timeControl: { initial: 300, increment: 0 },
-      myColor: null,
+      seats: MATCH,
       players: PLAYERS,
-      botId: "fly",
     });
   });
 
-  it("is a self-play game in which the bot moves for both colours", () => {
+  it("is watched by the player while the bots move for both colours", () => {
     const state = useGameStore.getState();
-    expect(isSelfPlay(state)).toBe(true);
+    expect(isSpectating(state)).toBe(true);
+    expect(state.myColor).toBeNull();
+    expect(state.seats).toEqual(MATCH);
     expect(botMovesFor(state, "w")).toBe(true);
     expect(botMovesFor(state, "b")).toBe(true);
   });
@@ -162,18 +163,19 @@ describe("the fly playing itself", () => {
 
   it("starts every new game unpaused", () => {
     useGameStore.getState().setPaused(true);
-    useGameStore.getState().newGame({ timeControl: { initial: 0, increment: 0 }, myColor: null, players: PLAYERS, botId: "fly" });
+    useGameStore.getState().newGame({ timeControl: { initial: 0, increment: 0 }, seats: MATCH, players: PLAYERS });
 
     expect(useGameStore.getState().paused).toBe(false);
   });
 
-  it("only pauses games the fly plays against itself", () => {
-    useGameStore.getState().newGame({ timeControl: { initial: 0, increment: 0 }, myColor: "w", players: PLAYERS, botId: "fly" });
+  it("only pauses games the player watches", () => {
+    useGameStore.getState().newGame({ timeControl: { initial: 0, increment: 0 }, seats: { w: null, b: { id: "thinker" } }, players: PLAYERS });
     useGameStore.getState().setPaused(true);
 
     const state = useGameStore.getState();
     expect(state.paused).toBe(false);
-    expect(isSelfPlay(state)).toBe(false);
+    expect(state.myColor).toBe("w");
+    expect(isSpectating(state)).toBe(false);
     expect(botMovesFor(state, "w")).toBe(false);
     expect(botMovesFor(state, "b")).toBe(true);
   });
