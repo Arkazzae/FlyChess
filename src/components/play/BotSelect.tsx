@@ -50,10 +50,7 @@ function BotCard({ opponent, selected, subtitle, featured = false, onSelect }: {
       </span>
       <span className="bot-card__rating">{subtitle}</span>
       {opponent.rating && (
-        <span className="bot-card__elo" aria-label={t("rating.elo", { elo: opponent.rating })}>
-          <strong>≈{opponent.rating}</strong>
-          <span>Elo</span>
-        </span>
+        <span className="elo-pill">{t("rating.elo", { elo: opponent.rating })}</span>
       )}
     </button>
   );
@@ -138,7 +135,6 @@ export function BotSelect() {
   const subtitle = (bot: Opponent) => bot.kind === "engine"
     ? t("engine.summary", { skill: engine[slot].skill, depth: engine[slot].depth })
     : bot.short;
-  const heroSubtitle = (bot: Opponent) => bot.rating ? t("rating.elo", { elo: bot.rating }) : subtitle(bot);
 
   return (
     <div className="bot-select">
@@ -158,7 +154,7 @@ export function BotSelect() {
           <div className="bot-hero__name">
             {isMatch
               ? <><strong>{pair[0].name}</strong> <span>vs</span> <strong>{pair[1].name}</strong></>
-              : <><strong>{opponent.name}</strong> <span>{heroSubtitle(opponent)}</span>{opponent.experimental && <span className="bot-tag bot-tag--experimental">{t("level.experimental")}</span>}</>}
+              : <><strong>{opponent.name}</strong> {opponent.rating ? <span className="elo-pill">{t("rating.elo", { elo: opponent.rating })}</span> : <span>{subtitle(opponent)}</span>}{opponent.experimental && <span className="bot-tag bot-tag--experimental">{t("level.experimental")}</span>}</>}
           </div>
           {/* Every line sits invisibly in the same cell, so the bubble keeps the height of the longest one. */}
           {flyChat && (

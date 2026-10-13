@@ -298,9 +298,10 @@ button:focus-visible, select:focus-visible, input:focus-visible, canvas:focus-vi
 .bot-card--featured .bot-card__img { width: 52px; height: 52px; }
 .bot-card--featured .bot-card__name { font-size: 15px; white-space: normal; }
 .bot-tag { white-space: nowrap; }
-.bot-card__elo { grid-column: 3; grid-row: 1 / 3; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.05; }
-.bot-card__elo strong { font-family: Montserrat, sans-serif; font-size: 20px; font-weight: 800; color: var(--gold); font-variant-numeric: tabular-nums; }
-.bot-card__elo span { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+/* A measured rating, wherever it is shown. */
+.elo-pill { display: inline-block; padding: 3px 10px; border-radius: 999px; background: rgba(255, 214, 90, 0.14); box-shadow: inset 0 0 0 1px rgba(255, 214, 90, 0.35); color: var(--gold); font-size: 13px; font-weight: 700; line-height: 1.3; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.bot-card .elo-pill { grid-column: 3; grid-row: 1 / 3; align-self: center; }
+.bot-hero__name .elo-pill { margin-left: 4px; color: var(--gold); font-size: 13px; vertical-align: 2px; }
 .bot-tag { display: inline-block; margin-left: 7px; padding: 1px 5px; border-radius: 3px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; vertical-align: 2px; }
 .bot-tag--featured { background: var(--green); color: #fff; }
 .bot-tag--experimental { border: 1px solid var(--gold); color: var(--gold); }
@@ -933,7 +934,9 @@ details.panel-section[open] summary { margin-bottom: 10px; }
   .bot-hero { padding: 18px 16px 10px; gap: 14px; }
   .bot-hero__portrait { width: 76px; height: 76px; }
   .bot-card--featured { padding-right: 10px; }
-  .bot-card__elo strong { font-size: 18px; }
+  /* The name and its tag take the full first row; the rating moves down beside the search style. */
+  .bot-card--featured .bot-card__name { grid-column: 2 / 4; }
+  .bot-card .elo-pill { grid-row: 2; align-self: start; padding: 2px 8px; font-size: 12.5px; }
   .bot-tag { margin-left: 5px; }
   .review-controls { display: none; }
   .mobile-bar__new { font-size: 26px; font-weight: 500; }
