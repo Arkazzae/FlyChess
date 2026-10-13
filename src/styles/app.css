@@ -293,6 +293,31 @@ button:focus-visible, select:focus-visible, input:focus-visible, canvas:focus-vi
 .bot-card__img { grid-row: 1 / 3; width: 40px; height: 40px; border-radius: 5px; display: grid; place-items: center; }
 .bot-card__name { align-self: end; font-weight: 700; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bot-card__rating { align-self: start; color: var(--text-2); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The Thinker: a full-width card with its measured rating on the right. */
+.bot-card--featured { grid-column: 1 / -1; grid-template-columns: 52px minmax(0, 1fr) auto; padding: 9px 14px 9px 10px; }
+.bot-card--featured .bot-card__img { width: 52px; height: 52px; }
+.bot-card--featured .bot-card__name { font-size: 15px; white-space: normal; }
+.bot-tag { white-space: nowrap; }
+.bot-card__elo { grid-column: 3; grid-row: 1 / 3; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.05; }
+.bot-card__elo strong { font-family: Montserrat, sans-serif; font-size: 20px; font-weight: 800; color: var(--gold); font-variant-numeric: tabular-nums; }
+.bot-card__elo span { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+.bot-tag { display: inline-block; margin-left: 7px; padding: 1px 5px; border-radius: 3px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; vertical-align: 2px; }
+.bot-tag--featured { background: var(--green); color: #fff; }
+.bot-tag--experimental { border: 1px solid var(--gold); color: var(--gold); }
+.bot-hero__name .bot-tag { font-size: 10px; }
+/* Proof-of-concept levels, folded away under the main grid. */
+.bot-lab { margin-top: 10px; }
+.bot-lab summary { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); cursor: pointer; list-style: none; }
+.bot-lab summary::-webkit-details-marker { display: none; }
+.bot-lab summary::before { content: ""; width: 0; height: 0; border-left: 5px solid currentColor; border-top: 4px solid transparent; border-bottom: 4px solid transparent; transition: transform 0.12s; }
+.bot-lab[open] summary::before { transform: rotate(90deg); }
+.bot-lab summary:hover { color: var(--text-2); }
+.bot-lab summary .model-subtitle { margin-left: 2px; }
+.bot-lab .bot-grid { margin-top: 6px; }
+.bot-card--experimental { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
+.bot-card--experimental:hover { background: var(--btn); }
+.bot-card--experimental.is-selected { box-shadow: 0 0 0 3px var(--green); }
+.bot-lab__note { margin: 7px 0 0; font-size: 11.5px; line-height: 1.4; color: var(--text-2); }
 /* A match: both portraits in the hero, overlapping corner to corner. */
 .bot-hero__pair { position: relative; width: 84px; height: 84px; flex: none; }
 .bot-hero__seat { position: absolute; width: 58px; height: 58px; border-radius: 8px; overflow: hidden; }
@@ -493,6 +518,9 @@ button:focus-visible, select:focus-visible, input:focus-visible, canvas:focus-vi
   .bot-select__section h3 { margin-bottom: 7px; }
   .mode-pick button { padding: 7px 6px; font-size: 13.5px; }
   .bot-card { padding: 5px 10px; }
+  .bot-card--featured { padding: 6px 12px 6px 10px; }
+  .bot-card--featured .bot-card__img { width: 44px; height: 44px; }
+  .bot-lab { margin-top: 6px; }
   .side-pick button { width: 46px; height: 46px; }
   .side-king { width: 34px; height: 34px; }
   .bot-select__row { gap: 4px; padding-top: 10px !important; padding-bottom: 10px !important; }
@@ -904,6 +932,9 @@ details.panel-section[open] summary { margin-bottom: 10px; }
   .bot-select__footer { position: sticky; bottom: 0; z-index: 5; box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.35); }
   .bot-hero { padding: 18px 16px 10px; gap: 14px; }
   .bot-hero__portrait { width: 76px; height: 76px; }
+  .bot-card--featured { padding-right: 10px; }
+  .bot-card__elo strong { font-size: 18px; }
+  .bot-tag { margin-left: 5px; }
   .review-controls { display: none; }
   .mobile-bar__new { font-size: 26px; font-weight: 500; }
   .mobile-bar__play { background: var(--green) !important; color: #fff !important; font-size: 17px; flex: 1.4 !important; }

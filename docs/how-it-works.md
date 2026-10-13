@@ -68,7 +68,11 @@ threefold claims and fifty-move claims use exact rules. A second occurrence
 alone is not scored as a draw. The final choice favours visit count, then prior;
 there is no opening-book or Stockfish move fallback.
 
-### Sage: an adaptive budget
+### Sage: an adaptive budget (experimental)
+
+Sage is a proof of concept. The bot screen keeps it in a folded
+**Experimental** section below the other flies and labels it wherever it plays,
+because the adaptive stop is not yet stable enough to be a main opponent.
 
 Sage treats 256 simulations as a ceiling. It checks after the root evaluation
 and then every 8 simulations, and stops as soon as one of these holds:

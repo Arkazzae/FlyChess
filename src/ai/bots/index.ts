@@ -28,6 +28,10 @@ export interface Opponent {
   avatarUrl: string;
   /** Voice in the chat bubble. */
   bot: BotDefinition;
+  /** Measured Elo, shown next to the bot; only where a benchmark exists (the Thinker). */
+  rating?: number;
+  /** Still a proof of concept (the Sage): kept apart on the bot screen and labelled. */
+  experimental?: boolean;
 }
 
 /** Stockfish's strength as the player sets it (this build has no Elo option; see stockfish-player). */
@@ -57,6 +61,8 @@ const flies: Opponent[] = FLY_LEVELS.map((level) => ({
   tint: level.tint,
   avatarUrl: flyAvatarUrl(level.id),
   bot: fly,
+  rating: level.rating,
+  experimental: level.experimental,
 }));
 
 const characters: Opponent[] = CHARACTERS.map((character: Character) => ({
@@ -117,7 +123,10 @@ export function seatFor(id: OpponentId, engineConfig: EngineConfig): Seat {
 /** The line under a bot's name on its player bar. */
 export function seatSubtitle(seat: Seat): string {
   const opponent = getOpponent(seat.id);
-  if (opponent.kind === "fly") return "DROSO-1";
+  if (opponent.kind === "fly") {
+    if (opponent.rating) return `DROSO-1 · ${t("rating.elo", { elo: opponent.rating })}`;
+    return opponent.experimental ? `DROSO-1 · ${t("level.experimental")}` : "DROSO-1";
+  }
   if (opponent.kind === "engine") {
     const config = seat.engine ?? DEFAULT_ENGINE;
     return t("engine.summary", { skill: config.skill, depth: config.depth });

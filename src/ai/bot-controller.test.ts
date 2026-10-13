@@ -22,6 +22,11 @@ describe("fly move selection", () => {
     // Unknown or missing choices still fall back to the Thinker.
     expect(getFlyLevel("unknown").id).toBe("thinker");
   });
+
+  it("rates only the benchmarked Thinker and marks only the Sage as experimental", () => {
+    expect(FLY_LEVELS.filter((level) => level.rating).map((level) => [level.id, level.rating])).toEqual([["thinker", 1500]]);
+    expect(FLY_LEVELS.filter((level) => level.experimental).map((level) => level.id)).toEqual(["sage"]);
+  });
 });
 
 describe("engine move time", () => {

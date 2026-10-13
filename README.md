@@ -15,10 +15,14 @@ Stockfish's analysis, and put the whole thing in your browser.
 **[fly-chess-thinker.vercel.app](https://fly-chess-thinker.vercel.app/)**:
 pick an opponent, pick a colour, press **Play**.
 
-- **Scout** looks at 8 positions before it moves, **Tactician** at 32,
-  **Thinker** at 64. Same brain, different patience.
-- **Sage** decides for itself: one look for an obvious move, up to 256 when it
-  can't make up its mind.
+- **Thinker** is the main opponent: it looks at 64 positions before it moves
+  and is the only fly with a measured rating, about **1500 Elo** (see
+  [Is it any good?](#is-it-any-good)). **Scout** looks at 8 and **Tactician**
+  at 32. Same brain, different patience.
+- **Sage** is an experimental proof of concept, folded away under the other
+  flies: it decides for itself how long to think, from one look for an obvious
+  move up to 256 when it can't make up its mind. Its search can be unstable,
+  so expect the odd slow or strange move.
 - Not ready for an insect? Three other bugs play from Stockfish's ideas, each
   in their own style: **Marvin** the beginner beetle, **Nelsen** the wasp who
   brings his queen out early, and **Mitzi**, a ladybug in knitted mittens who
