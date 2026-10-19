@@ -67,6 +67,7 @@ export function Board({ children, interactive = true }: { children?: ReactNode; 
   const boardRef = useRef<HTMLDivElement>(null);
   const suppressClickRef = useRef(false);
   const [boardSize, setBoardSize] = useState(560);
+  const [zoomed, setZoomed] = useState(false);
   const [dragState, setDragState] = useState<{
     square: Square;
     color: PieceColor;
@@ -272,6 +273,16 @@ export function Board({ children, interactive = true }: { children?: ReactNode; 
     ]
   );
 
+  // Close the enlarged board with Escape.
+  useEffect(() => {
+    if (!zoomed) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setZoomed(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [zoomed]);
+
   // ── Measure board on mount for overlays ──
   const measuredRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -319,13 +330,26 @@ export function Board({ children, interactive = true }: { children?: ReactNode; 
 
   return (
     <div
-      className="board-wrapper"
+      className={`board-wrapper${zoomed ? " board-wrapper--zoomed" : ""}`}
       onContextMenu={onContextMenu}
       onPointerDown={onRightPointerDown}
       onPointerUp={onRightPointerUp}
       onPointerCancel={onRightPointerCancel}
       style={{ "--square-size": `${sqSize}px` } as React.CSSProperties}
     >
+      <button
+        type="button"
+        className="board-zoom-button"
+        aria-label={zoomed ? "Exit enlarged board" : "Enlarge board"}
+        title={zoomed ? "Exit enlarged board (Esc)" : "Enlarge board"}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          setZoomed((value) => !value);
+        }}
+      >
+        {zoomed ? "⤢ Close" : "⛶ Enlarge"}
+      </button>
       <div
         className="board"
         ref={measuredRef}

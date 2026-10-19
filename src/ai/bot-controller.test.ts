@@ -16,16 +16,18 @@ describe("fly move selection", () => {
     expect(getFlyTemperature(true, 60)).toBe(0);
   });
 
-  it("gives the Sage a ceiling of 256 simulations and lets it stop when sure", () => {
-    expect(getFlyLevel("sage").plan).toEqual({ simulations: 256, adaptive: true });
-    expect(FLY_LEVELS.filter((level) => level.plan.adaptive).map((level) => level.id)).toEqual(["sage"]);
-    // Unknown or missing choices still fall back to the Thinker.
+  it("offers fixed 64/128/256 search budgets and defaults to 256", () => {
+    expect(FLY_LEVELS.map((level) => level.plan.simulations)).toEqual([64, 128, 256]);
+    expect(getFlyLevel("scout").plan).toEqual({ simulations: 64 });
+    expect(getFlyLevel("tactician").plan).toEqual({ simulations: 128 });
+    expect(getFlyLevel("thinker").plan).toEqual({ simulations: 256 });
+    expect(getFlyLevel(undefined).id).toBe("thinker");
     expect(getFlyLevel("unknown").id).toBe("thinker");
+    expect(getFlyLevel("sage").id).toBe("thinker");
   });
 
-  it("rates only the benchmarked Thinker and marks only the Sage as experimental", () => {
-    expect(FLY_LEVELS.filter((level) => level.rating).map((level) => [level.id, level.rating])).toEqual([["thinker", 1500]]);
-    expect(FLY_LEVELS.filter((level) => level.experimental).map((level) => level.id)).toEqual(["sage"]);
+  it("shows the measured rating only for the tested 64-simulation setting", () => {
+    expect(FLY_LEVELS.filter((level) => level.rating).map((level) => [level.id, level.rating])).toEqual([["scout", 1500]]);
   });
 });
 

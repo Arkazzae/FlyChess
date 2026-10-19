@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { BotPortrait } from "@/components/BotPortrait";
 import { useTranslation } from "@/i18n";
 import { ENGINE_MOVE_TIMES, getOpponent, OPPONENTS, type EngineConfig, type Opponent, type OpponentId } from "@/ai/bots";
@@ -13,10 +13,9 @@ const MODES: PlayMode[] = ["vsBot", "match"];
 const SIDES: SideChoice[] = ["w", "random", "b"];
 const COLORS: PieceColor[] = ["w", "b"];
 const FLIES = OPPONENTS.filter((opponent) => opponent.kind === "fly");
-/** The Thinker leads the fly section: it is the default and the only level with a measured rating. */
+/** Scout keeps the published 64-simulation benchmark; Thinker is the new 256 default. */
 const FEATURED = FLIES.find((opponent) => opponent.id === "thinker")!;
-const MAIN_FLIES = FLIES.filter((opponent) => opponent !== FEATURED && !opponent.experimental);
-const EXPERIMENTAL = FLIES.filter((opponent) => opponent.experimental);
+const MAIN_FLIES = FLIES.filter((opponent) => opponent !== FEATURED);
 const STOCKFISH_FAMILY = OPPONENTS.filter((opponent) => opponent.kind !== "fly");
 const SPEAKERS = [...OPPONENTS.map((opponent) => opponent.id), "mirror", "match"];
 
@@ -120,12 +119,6 @@ export function BotSelect() {
   const speaker = isMatch ? (flyMirror ? "mirror" : "match") : opponent.id;
   // A new line every time a different bot or mode is picked.
   const speech = useMemo(() => Math.floor(Math.random() * 3), [speaker, opponentId]);
-  // The experimental section starts folded, and unfolds whenever its bot is the one being seated.
-  const lab = useRef<HTMLDetailsElement>(null);
-  const experimentalSelected = getOpponent(selectedId).experimental;
-  useEffect(() => {
-    if (experimentalSelected && lab.current) lab.current.open = true;
-  }, [experimentalSelected]);
 
   /** Seat a bot; a fly's brain starts loading straight away so the game can begin without waiting. */
   const pick = (id: OpponentId) => {
@@ -209,13 +202,6 @@ export function BotSelect() {
           {MAIN_FLIES.map((item) => <BotCard key={item.id} opponent={item} selected={item.id === selectedId} subtitle={item.short} onSelect={() => pick(item.id)} />)}
         </div>
         <p className="bot-select__note">{t("select.ratingNote")}</p>
-        <details ref={lab} className="bot-lab">
-          <summary>{t("select.labTitle")} <span className="model-subtitle">{t("select.labHint")}</span></summary>
-          <div className="bot-grid" role="radiogroup" aria-label={t("select.labTitle")}>
-            {EXPERIMENTAL.map((item) => <BotCard key={item.id} opponent={item} selected={item.id === selectedId} subtitle={item.short} onSelect={() => pick(item.id)} />)}
-          </div>
-          <p className="bot-lab__note">{t("select.labNote")}</p>
-        </details>
       </div>
 
       <div className="bot-select__section">

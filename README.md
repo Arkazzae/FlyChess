@@ -1,4 +1,4 @@
-![FlyChess: play chess against the brain of a fruit fly](docs/media/banner-illustrated.png)
+![FlyChess: play chess against the brain of a fruit fly](docs/media/banner-illustrated.png),
 
 Ever lost at chess to an insect? Here's your chance.
 
@@ -15,14 +15,11 @@ Stockfish's analysis, and put the whole thing in your browser.
 **[fly-chess-thinker.vercel.app](https://fly-chess-thinker.vercel.app/)**:
 pick an opponent, pick a colour, press **Play**.
 
-- **Thinker** is the main opponent: it looks at 64 positions before it moves
-  and is the only fly with a measured rating, about **1500 Elo** (see
-  [Is it any good?](#is-it-any-good)). **Scout** looks at 8 and **Tactician**
-  at 32. Same brain, different patience.
-- **Sage** is an experimental proof of concept, folded away under the other
-  flies: it decides for itself how long to think, from one look for an obvious
-  move up to 256 when it can't make up its mind. Its search can be unstable,
-  so expect the odd slow or strange move.
+- **Thinker** is the default and searches up to **256** PUCT simulations per move.
+  **Tactician** searches 128; **Scout** searches 64 and keeps the published
+  benchmark setting (about **1500 conditional Elo** in a limited Stockfish test;
+  see [Is it any good?](#is-it-any-good)). Same trained brain, different search budgets.
+  The 128- and 256-simulation settings have not yet been separately rated.
 - Not ready for an insect? Three other bugs play from Stockfish's ideas, each
   in their own style: **Marvin** the beginner beetle, **Nelsen** the wasp who
   brings his queen out early, and **Mitzi**, a ladybug in knitted mittens who
@@ -45,10 +42,10 @@ brain regions, the moves it is weighing, and the board as its eyes see it.
 
 ## Is it any good?
 
-Better than you'd expect from something that tastes with its feet. The Thinker
-scored about **1500** in 64 games against a deliberately weakened Stockfish 19
+Better than you'd expect from something that tastes with its feet. The 64-simulation Scout
+scored about **1500 conditional Elo** in 64 games against a deliberately weakened Stockfish 19
 ([how we tested](benchmarks/droso-1/README.md)). That number belongs to this
-one test, not to FIDE, and the other flies haven't been measured.
+one test, not to FIDE. The 128- and 256-simulation settings have not yet been separately measured.
 
 It learned from scratch which moves look promising and who is winning, working
 through 26 million chess positions (some more than once). Not bad for a
@@ -70,3 +67,12 @@ or train your own is in this repository:
 Code: [MIT](LICENSE). Connectomes: FlyWire v783, plus MaleCNS v1.0 for the
 [old prototypes](artifacts/legacy/), both CC BY 4.0. The evaluation bar, the
 game review and the Stockfish-powered opponents use Stockfish (GPL-3.0).
+
+
+### Compare search budgets
+
+The optional paired benchmark runs the same fixed positions through the unchanged DROSO-1 weights at 64, 128, and 256 simulations. It reports move changes, elapsed time, and evaluator calls; this is a search-cost comparison, **not** an Elo/playing-strength result.
+
+```sh
+FLY_SEARCH_BENCHMARK=1 pnpm vitest run src/ai/fly/search-budget-benchmark.test.ts
+```
