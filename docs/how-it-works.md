@@ -163,3 +163,33 @@ The four non-fly opponents do not use the connectome. They run on the bundled We
 - **WebGPU acceleration:** When a compatible hardware adapter is available, the 10 sparse matrix-vector propagation steps run on the GPU via compute shaders (`src/ai/fly/gpu.ts`), falling back transparently to typed-array CPU loops (`src/ai/fly/brain.ts`).
 - **Live neural recording:** Before each search, a dedicated CPU pass records 11 activity frames (resting frame 0 plus steps 1–10) across all 134,181 neurons, along with the $6\times 6$ excitatory and inhibitory synaptic flux between anatomical regions.
 - **3D Point Cloud & Review:** The WebGL viewer (`src/brain/CloudView.ts`) plots the 117,708 neurons that have measured `soma_x/y/z` coordinates in FlyWire annotations v2.1.0 (the remaining 16,473 neurons without recorded soma coordinates still participate in the math, but are omitted from the 3D render rather than placed at fake coordinates). During post-game review, stepping through the move list recomputes the 10-step propagation live for any board position.
+
+---
+
+## 8. Anatomy vs. Adapters: How Much of the Model Is the Fly?
+
+Because DROSO-1 is trained end-to-end with AdamW and backpropagation, it is useful to separate what is fixed by the FlyWire connectome, what is learned inside the biological graph, and what lives in the artificial input/output adapters (`artifacts/droso-1/weights.npz`).
+
+### Parameter Breakdown
+
+Excluding the training-only opponent-reply head (`2,138,184` parameters) and the two unused auxiliary value outputs (`1,026` parameters), **9,551,183 trainable parameters** are active during play (`11,690,393` in total across the checkpoint):
+
+| Component | Tensor(s) | Parameters | Share of Active Model | Role |
+| :--- | :--- | ---: | ---: | :--- |
+| **Connectome gains** | `gain` (`[2700513]`) | 2,700,513 | 28.3% | Per-edge log-multiplier $g_e$ scaling anatomical synapse counts |
+| **Connectome biases** | `bias` (`[134181]`) | 134,181 | 1.4% | Per-neuron resting threshold $b_i$ |
+| **Visual projection** | `vis_weight` (`[22586, 15]`) | 338,790 | 3.5% | Maps 15 per-square features to 22,586 optic-lobe neurons |
+| **Global projection** | `glob_weight` (`[4885, 22]`) | 107,470 | 1.1% | Maps 22 global board features to 4,885 sensory neurons |
+| **Readout MLP trunk** | `feature_norm`, `hidden`, `hidden2` | 4,131,532 | 43.3% | `BatchNorm1d(7526)` $\to$ `Linear(7526, 512)` $\to$ `Linear(512, 512)` |
+| **Policy & value heads** | `policy`, `value[0]` | 2,138,697 | 22.4% | Maps the 512-unit readout to 4,168 moves + $\tanh(\text{cp}/600)$ |
+| **Total active** | | **9,551,183** | **100.0%** | **29.7% inside the connectome · 70.3% in sensory/readout adapters** |
+
+### Biological Constraints vs. Learned Modulation
+
+1. **99.985% topological sparsity:** A dense recurrent matrix over $134,181$ neurons would contain $1.80 \times 10^{10}$ weights. The FlyWire graph fixes the adjacency pattern to the $2,700,513$ biological connections ($0.015\%$ density), forcing all board information to traverse 10 recurrent steps from the sensory periphery to the readout population.
+2. **Sign preservation (Dale's Law):** Because each edge weight is $c_e \cdot s_{\text{src}} \cdot \exp(g_e)$ with $\exp(g_e) > 0$, gradient descent cannot flip an inhibitory GABA/glutamate neuron ($s = -1$) into an excitatory one ($s = +1$).
+3. **Distribution of learned gains $\exp(g_e)$:** With L2 gain regularization ($10^{-3}\,\overline{g^2}$) and a $2\times 10^{-5}$ learning rate, training tuned **1,780,206** of the 2,700,513 edges (65.9% non-zero), but kept the multipliers tightly anchored to the electron-microscope synapse counts $c_e$:
+   - **5th to 95th percentile of $\exp(g_e)$:** `0.9787×` to `1.0202×` (90% of connections stayed within $\pm 2\%$ of their anatomical synapse count).
+   - **Full range across all 2.7M edges:** `0.3749×` ($\min g_e = -0.981$) to `2.2198×` ($\max g_e = +0.797$), with standard deviation $\sigma(g_e) = 0.0239$.
+4. **Learned circuit vs. recurrent reservoir:** Because 70.3% of active parameters reside in the sensory projection and the 2-layer 512-unit readout MLP, the model combines two mechanisms: recurrent feature propagation shaped by the tuned connectome and nonlinear decoding in the readout MLP. Separating how much the specific biological topology contributes beyond a generic sparse recurrent reservoir requires a frozen-connectome ($g_e = 0$) or degree-matched random-graph ablation (see [Research Notes](droso-1/research.md#4-what-this-does-and-does-not-prove)).
+

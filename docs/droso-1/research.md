@@ -75,7 +75,7 @@ Full tables, confidence intervals, and PGN archives are documented in [`benchmar
 
 ### Gradients Reach the Connectome, Not Just the Readout
 
-In the frozen 26M checkpoint, **1,780,206 of the 2,700,513 connectome edges (65.9%)** have non-zero learned log-gains $g_e$. Combined with the 10-step recurrent bottleneck between the optic lobes and the readout electrodes, this confirms that backpropagation actively tunes the connectome's internal pathways rather than leaving the graph inert. At the same time, because log-gains are regularized ($10^{-3}\,\overline{g^2}$) and trained at $2\times 10^{-5}$, 90% of edge multipliers $\exp(g_e)$ stay within **0.98×–1.02×** of their biological synapse counts (see [How Much of the Fly Is Actually Left?](../../README.md#wait-how-much-of-the-fly-is-actually-left)).
+In the frozen 26M checkpoint, **1,780,206 of the 2,700,513 connectome edges (65.9%)** have non-zero learned log-gains $g_e$. Combined with the 10-step recurrent bottleneck between the optic lobes and the readout electrodes, this confirms that backpropagation actively tunes the connectome's internal pathways rather than leaving the graph inert. At the same time, because log-gains are regularized ($10^{-3}\,\overline{g^2}$) and trained at $2\times 10^{-5}$, 90% of edge multipliers $\exp(g_e)$ stay within **0.98×–1.02×** of their biological synapse counts (see [Anatomy vs. Adapters](../how-it-works.md#8-anatomy-vs-adapters-how-much-of-the-model-is-the-fly)).
 
 ### Limitations & Next Experiments
 

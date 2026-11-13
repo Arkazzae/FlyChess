@@ -2,48 +2,46 @@
 
 # FlyChess
 
-**FlyChess** lets you play chess against **DROSO-1**—a neural network built directly on the physical wiring diagram of a female fruit fly's brain (*Drosophila melanogaster*), reconstructed cell by cell under an electron microscope by the [FlyWire Consortium](https://flywire.ai).
+**FlyChess** lets you play chess against the brain of a fruit fly.
 
-The model runs on **134,181 neurons** connected by **2,700,513 directed pathways** (representing 34.2 million measured synapses). Who connects to whom, how many synapses link each pair, and whether a neuron is excitatory or inhibitory come straight from the biological connectome and never change. We attached a visual encoder to the fly's optic lobes, a motor readout to its descending pathways, and trained the synaptic gains and readout weights on 26 million chess positions analysed by Stockfish.
+Scientists at the [FlyWire Consortium](https://flywire.ai) sliced a real female fruit fly's brain under an electron microscope and mapped every single cell—**134,181 neurons** and **2.7 million connections** between them. We took that exact wiring diagram, hooked a chessboard up to the neurons in the fly's eyes, connected move decisions to the neurons that would normally steer its body, and taught it to play chess by studying 26 million positions analysed by Stockfish.
 
-The entire brain (~51 MB compressed) downloads once and runs locally in your browser via WebGPU (with a CPU fallback)—no backend, no accounts.
+The whole brain (about 51 MB) downloads once and runs directly in your browser—no account, no server, and works on phones too.
 
 <img src="docs/media/gameplay.gif" width="800" alt="A game against the Thinker fly: candidate moves appear as arrows on the board while Stockfish's evaluation bar tracks the position">
 
 ---
 
-## Play in the Browser
+## Play
 
-**[fly-chess-thinker.vercel.app](https://fly-chess-thinker.vercel.app/)** — choose an opponent, pick a colour, and press **Play**.
+**[fly-chess-thinker.vercel.app](https://fly-chess-thinker.vercel.app/)** — pick an opponent, choose White or Black, and press **Play**.
 
-### The Fly Personas (DROSO-1)
+### The Flies
 
-All four fly opponents run the exact same trained connectome checkpoint. They differ only in how many positions they evaluate via PUCT tree search before committing to a move:
+All four flies share the exact same brain (**DROSO-1**). The only difference is how long they stop to think before making a move:
 
-| Persona | Search Budget | Style & Notes |
-| :--- | :--- | :--- |
-| **Scout** | 8 simulations | Fast, intuitive play driven mostly by the connectome's raw policy instinct. |
-| **Tactician** | 32 simulations | Checks immediate replies and basic tactical sequences. |
-| **Thinker** *(Default)* | 64 simulations | Full benchmarked setting. Scored **~1500 Elo** (95% CI: 1410–1603) against depth-limited Stockfish 19 ([benchmark details](benchmarks/droso-1/README.md)). |
-| **Sage** *(Experimental)* | 1 – 256 simulations | Dynamically decides when to stop searching: plays obvious moves after a single pass and thinks up to 256 evaluations when torn. |
+- **Scout** *(Quick)* — Glances at **8 positions** before moving. Plays mostly on gut instinct.
+- **Tactician** *(Balanced)* — Looks ahead **32 positions** to check your immediate replies.
+- **Thinker** *(Default · ~1500 Elo)* — Evaluates **64 positions** per move. This is the only fly we rated in a full benchmark: it scored about **1500 Elo** across 64 games against a weakened Stockfish 19 ([see the benchmark](benchmarks/droso-1/README.md)).
+- **Sage** *(Experimental)* — Decides for itself how long to think: moves immediately when a choice is obvious, and checks up to **256 positions** when it's torn. (Tucked under the *Experimental* tab because its search can occasionally take a while or play an odd move.)
 
-### Other Opponents & Modes
+### Other Bugs & Modes
 
-- **Bug personalities (Stockfish-backed):** If you want a different flavour of opponent, three non-connectome characters choose among Stockfish's top lines using custom heuristics: **Marvin** (a beginner beetle who loves captures and occasionally hangs pieces), **Nelsen** (a wasp obsessed with early queen attacks), and **Mitzi** (a polite ladybug in knitted mittens who plays near-optimal depth-14 lines).
-- **Configurable Stockfish:** Play the bundled WebAssembly Stockfish engine directly at any skill level (0–20), search depth, and move time.
-- **Bot vs. Bot:** Pair any two bots—including the fly against itself—and watch them play. When a fly is at the board, you can pause at any move and inspect its neural activity (or compare both brains side by side in a mirror match).
+- **Three Stockfish-powered characters:** If you want a break from the fly, three other insects pick from Stockfish's ideas in their own style—**Marvin** (a beginner beetle who grabs everything and hangs pieces), **Nelsen** (a wasp who brings his queen out early), and **Mitzi** (a polite ladybug in knitted mittens who rarely misses a tactic).
+- **Custom Stockfish:** Play the classic Stockfish engine directly at whatever skill level, search depth, and time limit you prefer.
+- **Bot vs. Bot:** Pair any two bots—including the fly against itself—and watch them play. Pause anytime to inspect the board or peek inside the brain.
 
 ---
 
-## Watch the Connectome Think
+## Watch the Brain Work
 
-Every time the fly evaluates the board, the position is injected into its optic lobes and non-visual sensory neurons. Activity propagates across the recurrent connectome for **10 discrete time steps** before the readout layer decodes a move preference and position evaluation.
+Before every move, the chessboard is sent to the fly's visual neurons. A wave of activity travels from its eyes through the centre of its brain over **10 steps**, and the move is read out at the end.
 
-Switching to the **Fly Brain** tab (or full-screen brain view) replays that 10-step wave on the actual anatomy:
+Open the **Fly Brain** tab during any game to watch that wave happen live:
 
-- **3D Point Cloud (WebGL):** Displays **117,708 neurons** at their measured cell-body (*soma*) coordinates from FlyWire, colour-coded across six anatomical divisions (visual circuits, visual projections, central brain, motor output, ascending pathways, and other senses).
-- **Inter-Region Flow:** Tracks excitatory (green) and inhibitory (red) signal traffic between brain regions at each tick of the propagation wave.
-- **Fly Retina & Candidate Thoughts:** Shows the 15-channel board representation feeding into the 22,586 visual neurons alongside the PUCT search tree's top candidate lines.
+- **3D Brain View:** Shows **117,708 neurons** at their real measured positions inside the fly's head, lighting up as the signal spreads from the eyes to the central brain and motor outputs.
+- **Region Flow:** Shows which parts of the brain are exciting each other (green) or acting as brakes (red) at each step.
+- **What the Fly Sees & Thinks:** Displays the board as the fly's eyes receive it alongside the candidate moves it is weighing.
 
 <img src="docs/media/brain.gif" width="800" alt="3D visualization of simulated neural activity spreading across 117,708 positioned neurons in the FlyWire connectome">
 
@@ -51,67 +49,49 @@ Switching to the **Fly Brain** tab (or full-screen brain view) replays that 10-s
 
 ## Wait—How Much of the Fly Is Actually Left?
 
-If you take a biological wiring diagram, bolt input and output layers onto it, and train it with PyTorch, AdamW, and backpropagation on 26 million chess positions, a fair question comes up immediately:
+If you take a fly's brain map and train it on a computer like any other AI neural network, an obvious question comes up:
 
-> **Is this still a fruit fly's brain, or is it just an ordinary neural network wearing a fly costume?**
+> **Is there still a fruit fly in there, or is it just a normal AI wearing a fly costume?**
 
-It is a bit of a neural Ship of Theseus. Looking at the actual tensors inside [`artifacts/droso-1/weights.npz`](artifacts/droso-1/README.md) gives a surprisingly concrete answer.
+It's a classic "Ship of Theseus" puzzle. Here is the honest breakdown of what stays real biology and what is artificial AI:
 
-### 1. What is 100% *Drosophila melanogaster*
+### 1. The wiring map is 100% real fly
+Imagine a city's road network. In a standard AI network, every neuron can connect to every other neuron—which for 134,181 neurons would mean **18 billion connections**. In the real fruit fly, evolution built only **2.7 million one-way roads** (less than 0.02% of all possible routes). During training, our AI is **never allowed to build a new road or demolish an existing one**. Every single signal from the chessboard has to travel down the exact pathways the real fly grew.
 
-- **The 99.985% sparse wiring topology:** A fully connected layer across 134,181 neurons would have **18.0 billion** weights. Evolution wired only **2,700,513** directed connections (with $\ge 5$ synapses)—just **0.015%** of all possible pairs. Backpropagation is never allowed to grow a new connection or prune an existing one. Every chess signal *must* enter through the optic lobes and sensory neurons, traverse the central brain over 10 recurrent steps, and reach the readout electrodes.
-- **Dale's Law (excitatory vs. inhibitory identity):** In standard neural networks, any weight can flip from positive to negative during training. Here, each neuron's neurotransmitter sign is locked to its biological prediction in FlyWire: GABA and glutamate neurons inhibit ($-1$); acetylcholine, dopamine, serotonin, and octopamine neurons excite ($+1$). Because the learned edge multiplier $\exp(g_e)$ is strictly positive, **gradient descent can never turn an inhibitory synapse into an excitatory one**.
-- **Microscope synapse counts still dominate the recurrent weights:** A connection with 150 physical synapses starts 30× stronger than a connection with 5 synapses. Each edge has a trainable log-gain $g_e$, regularized toward zero ($10^{-3}\,\overline{g^2}$) with a small learning rate ($2\times 10^{-5}$). After 26 million positions:
-  - **90% of all 2.7 million connections** (5th to 95th percentile) have a multiplier $\exp(g_e)$ between **0.98× and 1.02×**—within $\pm 2\%$ of their raw anatomical synapse count.
-  - Across the entire connectome, the most suppressed edge is scaled by **0.37×** and the most amplified edge by **2.22×**.
-  - Training did not overwrite the fly's synaptic weights; it nudged them.
+### 2. Brakes stay brakes, gas stays gas
+In a living brain, some neurons push signals forward (excitatory) and others act like brakes (inhibitory), depending on their chemistry. Those roles come straight from the fly data and are locked: training can make a connection slightly stronger or weaker, but it **can never turn a brake into a gas pedal**.
 
-### 2. Where the Artificial Network Takes Over
+### 3. Training nudged the brain instead of overwriting it
+Under the microscope, some connections between neurons are thick highways (hundreds of synapses) and others are tiny footpaths (just five). Training didn't wipe that out—in fact, **90% of the fly's 2.7 million connections changed by less than 2%** from their original microscope measurements.
 
-A fruit fly evolved to dodge swatters, navigate airflow, and find fermenting fruit—not to play the Ruy Lopez. Making the connectome play chess required three major departures from biology:
+### 4. The "cyborg" adapters on both ends
+Of course, a real fruit fly evolved to dodge swatters and find overripe bananas—not to spot knight forks. Its eyes don't naturally know what a rook is, and its leg muscles don't know how to play `e2–e4`.
 
-- **Rate dynamics instead of spiking biophysics:** Real *Drosophila* neurons communicate through action potentials, graded potentials, and complex dendritic arbor computations with distinct receptor time constants. DROSO-1 models each neuron as a leaky saturating rate unit (`drive / (1 + drive)`) running for 10 discrete steps, trained via Backpropagation Through Time (BPTT) over the final 4 steps.
-- **Prosthetic sensory and motor adapters:** Hexagonal ommatidia in a compound eye do not naturally see rooks or en passant flags, and descending motor neurons are wired to drive wings and six legs, not a 4,168-move chess action space. Linear projections translate the 64-square board into sensory currents, and a 2-layer 512-unit MLP decodes neural activity from 7,526 readout electrodes into move probabilities and centipawn evaluations.
-- **The 30 / 70 parameter split:** If you count every parameter active during a game (**9,551,183** in total, excluding the training-only reply head), the division between biological modulation and artificial adapters looks like this:
+To bridge that gap, we had to bolt two artificial translators onto the brain:
+- **A pair of "chess glasses" on the front** that translates the 64 squares of the board into signals for the fly's visual neurons.
+- **A "move translator" on the back** that reads the brain's final activity and turns it into legal chess moves.
 
-| Component | Trainable Parameters | Share of Active Model | Role |
-| :--- | ---: | ---: | :--- |
-| **Connectome gains & biases** | **2,834,694** | **29.7%** | 2,700,513 per-edge log-gains + 134,181 neuron biases inside the fly graph |
-| **Sensory interface** | **446,260** | **4.7%** | Projects 64×15 board channels $\to$ 22,586 optic neurons & 22 globals $\to$ 4,885 sensory neurons |
-| **Readout MLP trunk** | **4,131,532** | **43.3%** | Reads 7,526 electrodes $\to$ BatchNorm $\to$ 512 $\to$ 512 (Quick-GELU residual) |
-| **Policy & value heads** | **2,138,697** | **22.4%** | Maps the 512-dim readout state to 4,168 moves + position value |
+If you count all the settings tuned during training, about **30% live inside the fly's brain itself**, and **70% live in those front-and-back translators**.
 
-Roughly **30% of the trainable parameters live inside the biological connectome**, while **70% live in the sensory/motor prosthetics** bolted onto its ends.
+### So... is the fly actually thinking?
+That 30 / 70 split leaves a fun scientific question: *is the fly's brain actively calculating chess, or is it acting like a giant biological echo chamber that scrambles the board into a rich pattern for the translator at the end to read?*
 
-### 3. Learned Circuit or Biological Reservoir?
+In practice, it's a bit of both. Training actively tuned **1.78 million** of the fly's 2.7 million internal connections, so the brain is doing real work to pass useful signals from its eyes to its outputs—not just sitting idle. **Anatomically, your opponent is a real fruit fly; mathematically, it's a cyborg.**
 
-That parameter split raises the most interesting question of all: *is the fly's brain actively computing chess tactics, or is it acting as a giant recurrent reservoir—a biological [Liquid State Machine](https://en.wikipedia.org/wiki/Liquid_state_machine)—that projects the board into a high-dimensional space for the 512-unit readout MLP to untangle?*
-
-In practice, it is a hybrid of both:
-1. The connectome is not a passive, frozen reservoir: gradient descent actively modified **1,780,206** of the 2,700,513 biological connections, tuning the recurrent pathways so useful board features survive 10 hops from the optic lobes to the descending neurons.
-2. At the same time, the 2-layer readout MLP carries significant representational capacity of its own, reading directly from 7,526 electrodes distributed across the motor output, central brain, visual projections, and deep optic lobe.
-
-Without a controlled ablation—such as freezing all connectome gains at $g_e = 0$ or rewiring the 2.7 million edges randomly while keeping the readout identical—you cannot claim that evolution secretly wired *Drosophila* for chess. **Anatomically, your opponent is a real fruit fly's connectome; mathematically, it is a cyborg.**
+*(Want the exact parameter counts, equations, and technical details? See [Anatomy vs. Adapters in `docs/how-it-works.md`](docs/how-it-works.md#8-anatomy-vs-adapters-how-much-of-the-model-is-the-fly).)*
 
 ---
 
-## Documentation & Repository Guide
+## Under the Hood
 
-Everything needed to run the web app, run standalone Python inference, inspect the benchmark games, or train a new model from scratch is included in this repository:
+Everything needed to run the model, inspect the benchmarks, or train your own fly brain from scratch is in this repository:
 
-| Document | Contents |
-| :--- | :--- |
-| **[How DROSO-1 Works](docs/how-it-works.md)** | End-to-end technical architecture: board encoding, 64-square visual mapping, 10-step rate dynamics, readout MLP, PUCT search, and browser WebGPU execution. |
-| **[Training Overview](docs/training.md)** | High-level summary of the training pipeline, supervision targets, and entry points. |
-| **[Training Recipe](docs/droso-1/recipe.md)** | Step-by-step commands to build a corpus (Lichess + Stockfish self-play + DAgger mistakes), run the trainer, evaluate checkpoints, and export to the browser. |
-| **[Research Notes](docs/droso-1/research.md)** | Controlled A/B supervision experiment, comparison against the earlier `fly-v6` prototype, diagnostic findings, and experimental limitations. |
-| **[Benchmarks & PGNs](benchmarks/droso-1/README.md)** | Full breakdown of the ~1500 Elo Stockfish 19 probe, the 64-game match vs. `fly-v6` (37–10–17), and 512-position move-quality audits. |
-| **[Pretrained Python Bundle](artifacts/droso-1/README.md)** | Self-contained inference package (`artifacts/droso-1/`) with lossless FP32 weights, connectome graph, and verification scripts. |
-| **[Development Guide](docs/development.md)** | Local dev server, Playwright browser & WebGPU parity tests, directory layout, and media capture scripts. |
-| **[Data & Licences](docs/data.md)** | Provenance, citations, and licences for FlyWire v783, legacy MaleCNS v1.0, Lichess evaluations, and Stockfish. |
+- **[How DROSO-1 Works](docs/how-it-works.md)** — Full technical architecture: board encoding, 10-step brain dynamics, tree search, and the exact parameter breakdown.
+- **[Training Overview](docs/training.md)** & **[Step-by-Step Recipe](docs/droso-1/recipe.md)** — How the model was trained on 26 million positions and how to reproduce it.
+- **[Research Notes](docs/droso-1/research.md)** — Experiments, comparisons with earlier prototypes (`fly-v6`), and limitations.
+- **[Benchmarks & Game PGNs](benchmarks/droso-1/README.md)** — How the ~1500 Elo rating was measured, plus downloadable games.
+- **[Pretrained Python Model](artifacts/droso-1/README.md)** — Run the trained brain standalone in Python on CPU or GPU.
+- **[Development Guide](docs/development.md)** — Run the website locally and execute the browser tests.
+- **[Data & Licences](docs/data.md)** — Sources and citations for the FlyWire connectome, Lichess data, and Stockfish.
 
-## Licences
-
-- **Code & trained weights:** [MIT](LICENSE) (original training/inference port notice in [`training/LICENSE`](training/LICENSE)).
-- **Connectome data:** [FlyWire FAFB v783](https://zenodo.org/records/10676866) and [MaleCNS v1.0](https://male-cns.janelia.org/download/) (used in [legacy prototypes](artifacts/legacy/)), both under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
-- **Chess engine:** Bundled `stockfish.js` (evaluation bar, post-game review, and non-fly opponents) is licensed under **GPL-3.0**.
+**Licences:** Code and model weights are [MIT](LICENSE). Connectome data is from FlyWire v783 (and MaleCNS v1.0 for the [legacy prototypes](artifacts/legacy/)), both [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The evaluation bar, game review, and non-fly bots use Stockfish (GPL-3.0).
