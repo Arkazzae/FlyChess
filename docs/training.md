@@ -1,34 +1,45 @@
 # Training DROSO-1
 
-The released model was trained from scratch on the FlyWire v783 connectome.
-It is the original v10 arm B checkpoint after **26,000,128 sampled position
-presentations** and **101,563 steps**. Presentations include repeated samples.
+**DROSO-1** was trained from scratch on the fixed FlyWire v783 connectome for **101,563 optimizer steps** (**26,000,128 sampled position presentations**, batch size 256).
 
-The repository includes everything needed to implement the recipe and run the
-trained model:
+This directory and [`training/`](../training/README.md) contain the complete Python pipeline used to prepare the training corpus, train the connectome parameters and readout, evaluate checkpoints against Stockfish and historical baselines, and export the weights to the browser.
 
-- [Training recipe](droso-1/recipe.md): environment, data preparation, losses,
-  training, evaluation and export commands.
-- [Python pipeline](../training/README.md): runnable entry points and dependencies.
-- [Research](droso-1/research.md): the paired experiment and its limitations.
-- [Benchmarks](../benchmarks/droso-1/README.md): conditions, results, JSON and PGNs.
-- [Pretrained artifact](../artifacts/droso-1/README.md): standalone inference
-  bundle with weights, graph and verification fixtures.
+---
 
-The released B recipe trains the move policy, reply prediction and current CP
-value using Stockfish labels, Lichess evaluations and positions from model
-games, with an additional loss for recorded costly moves. Its future-value
-and outcome heads are not supervised; those losses belong to experimental
-arm A. Search uses the policy and current value, without the reply, future-value
-or outcome outputs. The graph stays fixed throughout training.
+## Where to Start
 
-Use Python 3.12 and a compatible CUDA PyTorch installation for training.
-The original full training corpus and optimizer state are not included; the
-recipe explains how to prepare a new corpus. The released inference bundle
-can run on CPU without Stockfish or the original workspace.
+| Goal | Document |
+| :--- | :--- |
+| **Run the pretrained model in Python** | **[Pretrained Bundle (`artifacts/droso-1/`)](../artifacts/droso-1/README.md)** — runs on CPU or CUDA with no Stockfish dependency or training corpus required. |
+| **Train a new model from scratch** | **[Training Recipe](droso-1/recipe.md)** — environment setup, corpus generation, data preparation, training commands, and browser export. |
+| **Understand the experimental design** | **[Research Notes](droso-1/research.md)** — why the pipeline was rebuilt after `fly-v6`, the controlled A/B supervision pilot, and known limitations. |
+| **Inspect ratings, PGNs, and error audits** | **[Benchmark Archive (`benchmarks/droso-1/`)](../benchmarks/droso-1/README.md)** — the ~1500 Elo Stockfish 19 probe, 64-game match vs. `fly-v6`, and 512-position regret tables. |
+| **Explore the Python codebase** | **[Python Pipeline (`training/`)](../training/README.md)** — module layout and unit test commands. |
 
-The browser runs the same checkpoint with 15 square features, 22 global
-features and 4,168 actions. Its three play styles use 8, 32 and 64 PUCT
-simulations. Only the 64-simulation setting has the published rating probe:
-about 1500 on that limited-Stockfish protocol, with a 95% interval of 1410–1603.
-This is not a FIDE or website rating.
+---
+
+## Supervision Summary
+
+During training, the connectome's 134,181 neurons and 2,700,513 directed connections remain topologically fixed. AdamW optimizes four parameter groups:
+1. **Per-connection log-gains** ($2.70\text{M}$ parameters) and **per-neuron biases** ($134\text{k}$ parameters), trained at learning rate $2\times 10^{-5}$.
+2. **Sensory projections** ($446\text{k}$ parameters) and **readout MLP + heads** ($8.41\text{M}$ parameters including auxiliary heads), trained at learning rate $6\times 10^{-5}$.
+
+Each batch mixes positions from three sources:
+- **Lichess evaluation database (~60.5% sampling share):** Positions with deep Stockfish MultiPV evaluations.
+- **DAgger mistake collection (~32.4% sampling share):** Positions from model games where an earlier move lost $\ge 100\text{ cp}$, providing targeted negative feedback on blunders.
+- **Stockfish self-play (~7.1% sampling share):** Full game trajectories with reply and outcome context.
+
+The released checkpoint (**Arm B** of the v10 experiment) supervises four targets:
+- **Move policy** (soft cross-entropy over Stockfish MultiPV lines across all 4,168 moves, including underpromotions),
+- **Current position value** ($\tanh(\text{cp} / 600)$ from the side to move),
+- **Opponent reply prediction** (auxiliary head over 4,168 moves), and
+- **DAgger mistake penalty** (penalizing probability mass placed on known costly moves).
+
+During actual gameplay, PUCT search uses only the **move policy** and **current position value**.
+
+---
+
+## System Requirements
+
+- **Inference only (`artifacts/droso-1/`):** Python 3.12 on CPU or CUDA; no Stockfish installation needed.
+- **Full training & evaluation (`training/`):** Linux or WSL2, Python 3.12, a CUDA-capable NVIDIA GPU (~4 GB VRAM minimum; originally trained on an RTX 4070 SUPER at ~1,285 positions/s), native Stockfish 19 (`STOCKFISH_EXECUTABLE`), and ~25 GB of disk space for shards and memory-mapped datasets.

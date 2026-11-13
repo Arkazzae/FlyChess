@@ -1,122 +1,93 @@
-# DROSO-1 research
+# DROSO-1 Research Notes
 
-DROSO-1 tests whether a fresh model built on the FlyWire v783 connectome can
-learn useful chess play with corrected supervision and a controlled training
-recipe. The released weights are the original v10 arm B, renamed without
-changing any learned tensor.
+**DROSO-1** was designed to answer a straightforward question: can a fresh model built on the [FlyWire FAFB v783](https://zenodo.org/records/10676866) female fruit-fly connectome learn competitive chess from scratch under a clean, reproducible training protocol?
 
-## Architecture
+Earlier prototypes (`fly-v4` and `fly-v6`, built on the MaleCNS v1.0 connectome) proved that a connectome-backed model could play legal, tactical chess in a browser, but their weights evolved across multiple warm-started stages where data mixtures, losses, and learning rates changed simultaneously. DROSO-1 resets the slate: all trainable weights, BatchNorm statistics, and optimizer states start from scratch on a fixed graph, sensory and action bugs from the earlier prototypes are fixed, and supervision choices are tested in a controlled A/B pilot.
 
-The fixed graph has **134,181 neurons and 2,700,513 directed connections**,
-representing 34,153,566 synapses after retaining connections with at least
-five synapses. Connection counts, neuron identities and transmitter signs
-stay fixed. Trainable log-gains scale the anatomical connections; neuron
-biases, sensory weights and the readout are also learned.
+---
 
-A rate model runs ten propagation steps from rest. Its activity saturates as
-`drive / (1 + drive)`, with update factor 0.65 and recurrent scale 0.95.
-Training differentiates through the last four steps. Edge gradients use 96
-examples from each 256-example batch to reduce memory use.
+## 1. What Changed from the Prototypes (`fly-v6` $\to$ `DROSO-1`)
 
-The sensory interface covers all 64 squares, using 15 features per square
-and 22 global features. It encodes en passant and explicitly marks unknown
-halfmove clocks and whether repetition history is known. The history-known
-flag stays false in the training records and search encoder; chess-rule
-checks use the available game history separately. The complete-square mapping
-replaces the older mapping, which left 14 squares without direct visual input. The
-published graph provenance describes that older mapping; the model constructs
-the corrected mapping at initialization.
+| Dimension | Legacy `fly-v6` | `DROSO-1` |
+| :--- | :--- | :--- |
+| **Connectome** | MaleCNS v1.0 (163,903 neurons · 6.24M edges) | FlyWire FAFB v783 (134,181 neurons · 2.70M edges) |
+| **Visual board coverage** | 50 of 64 squares (linear scaling of hexagonal eye columns left 14 corner squares blind) | **All 64 squares** via spatial band partitioning (`complete_square_map`) |
+| **Square / global features** | 14 per square / 9 global | **15 per square** (adds legal en passant plane) / **22 global** (adds explicit unknown-clock & history flags) |
+| **Action space** | 4,096 moves (`from * 64 + to`, queen promotions only) | **4,168 moves** (`4,096` standard/queen + `72` knight, bishop, and rook underpromotions) |
+| **Reply target frame** | Ambiguous coordinate orientation on Black replies | Canonicalized in the replying player's perspective |
+| **Deduplication** | Could overwrite DAgger blunder-cost labels | Preserves records with valid mistake costs and full game context |
+| **Browser precision** | Quantised (int8 gains/readout, fp16 sensory/biases) | **Lossless FP32** with folded BatchNorm |
 
-The readout combines descending/motor neurons with fixed samples from visual
-and central regions, followed by two 512-wide layers. Policy and reply each
-have 4,168 actions, including all four promotion types. During play, PUCT uses
-only the current `tanh(CP / 600)` value, plus terminal chess rules. Auxiliary
-reply, future and outcome outputs do not enter the search value.
+---
 
-## Why rebuild the recipe?
+## 2. Controlled A/B Supervision Pilot
 
-The older fly-v6 was a useful baseline, but its strength followed several
-training stages and data changes. Later experiments changed several factors
-at once, so their losses could not identify which ingredient mattered.
-DROSO-1 starts with new learned weights, BatchNorm statistics and AdamW state
-on a fixed graph, and changes one supervision package in the A/B pilot.
+In earlier experiments, it was unclear whether auxiliary value targets ($+8$-ply future centipawns, game outcome WDL, and temporal consistency between value heads) helped or hurt move quality.
 
-The data contract also fixes several ambiguities: replies use the replying
-side's coordinates; promotions retain their piece type; absent outcomes and
-future evaluations are masked; and recorded DAgger mistake costs are kept
-during deduplication. Current CP is never copied into an invented future label.
+To test this cleanly, two arms (**Arm A** and **Arm B**) were initialized with identical random seeds (`2026092301`), identical batch sequences, identical optimizer hyperparameters, and identical per-row weighting on the current-CP value head:
 
-## Controlled A/B pilot
+| Arm | Supervised Targets |
+| :--- | :--- |
+| **Arm A** *(Auxiliary package)* | Move policy + opponent reply + current CP + DAgger mistake cost + **actual $+8$-ply future CP + game outcome + temporal consistency ($0.25$)** |
+| **Arm B** *(Core package)* | Move policy + opponent reply + current CP + DAgger mistake cost |
 
-Both arms used identical initialization, batches, step seeds, optimizer
-settings and current-CP coefficients:
+Note that when future-CP or game-outcome labels were absent on a training record (such as single-position Lichess imports), they were strictly masked rather than backfilled with current CP.
 
-| Arm | Supervision |
-| --- | --- |
-| A | Policy, reply, current CP, mistake cost, actual future CP, known outcome, temporal consistency |
-| B | Policy, reply, current CP and mistake cost |
+### Pilot Results at 1,048,576 Presentations
 
-Each received 1,048,576 presentations. On 512 validation positions, A made
-126 severe errors and B made 124. Their 32-game match ended 13 A wins,
-7 draws and 12 B wins. That result did not establish a benefit from the
-auxiliary package, so the experiment continued the simpler B recipe under
-the predefined selection rule. It does not establish equivalence or show
-that auxiliary tasks cannot help with more training.
+Both arms were evaluated after 4,096 optimizer steps (1.05M presentations) on the 512-position validation split and in a 32-game head-to-head match at PUCT 64:
 
-B continued to 4, 8, 16 and 26 million presentations. At final selection,
-validation severe-error counts were 68, 56 and 53 for the 8M, 16M and 26M
-checkpoints. The final selection compared 16M with 26M; 8M was included only
-as a historical reference. The rule selected the lowest count among those
-two candidates, then common-subset mean CP cost in a tie, then the earlier
-checkpoint. The 26M candidate was frozen before the final test was opened.
+| Metric | Arm A | Arm B |
+| :--- | ---: | ---: |
+| **Severe errors on 512 validation positions** | 126 | **124** |
+| **32-game head-to-head match** | 13 W · 7 D · 12 L | 12 W · 7 D · 13 L |
 
-## Findings
+Because the auxiliary package in Arm A showed no measurable advantage on validation error count or match score, the predefined selection rule dropped the extra losses and continued **Arm B** for the full scaling run.
 
-DROSO-1 beat fly-v6 **37–10–17** in the 64-game held-out match, with both
-players using 64 PUCT simulations. Its separate Stockfish probe yielded
-approximately 1500 conditional Elo. However, on 512 held-out positions it
-made 61 severe errors against fly-v6's 56, and the uncertainty interval did
-not establish a difference in single-move quality. See the
-[benchmark report](../../benchmarks/droso-1/README.md) for conditions and data.
+### Scaling Arm B to 26 Million Presentations
 
-Longer training improved match results but did not improve every diagnostic.
-The final model matched reference moves on 13 of 15 known tactical tasks;
-an earlier checkpoint had reached 15/15 at PUCT 256. The final model also
-retained a known 671-cp mistake. More search did not consistently fix these
-errors. These small, previously inspected tasks are regression checks, not
-an independent strength estimate.
+Arm B was trained through checkpoints at 4M, 8M, 16M, and 26M presentations:
 
-Connection gains changed during training: 1,780,206 edges had nonzero
-log-gains in the final checkpoint. This confirms that optimization reached
-the graph parameters. It does not isolate the contribution of biological
-topology. Comparison with fly-v6 also changes anatomy, interfaces, training
-history and data exposure; it is not a topology-only ablation.
+| Presentations | Dev Severe Errors (/ 256) | Validation Severe Errors (/ 512) | Dev Match vs. `fly-v6` (16 games) |
+| ---: | ---: | ---: | :---: |
+| **1,048,576** | 60 | 124 | — |
+| **4,000,000** | 33 | — | 3 W · 1 D · 12 L |
+| **8,000,000** | 29 | 68 | 3 W · 2 D · 11 L |
+| **16,000,000** | 29 | 56 | 8 W · 5 D · 3 L |
+| **26,000,128** | **26** | **53** | **12 W · 1 D · 3 L** |
 
-## Limits and useful next experiments
+Before opening the held-out test set, the final candidate rule compared the 16M and 26M checkpoints on the 512-position validation set, selected the **26M checkpoint** (53 vs. 56 severe errors), and froze its weights as **DROSO-1**.
 
-The experiment has one initialization seed. Dev and validation were reused
-for development and selection; only the final test was reserved until the
-candidate was frozen. That test is now public and should be treated as a
-regression set for future work. Imported source-game identities and some
-teacher metadata were lost, limiting leakage and label-quality checks.
-The holdout was reserved for the fresh DROSO-1 experiment; the legacy fly-v6
-baseline may have encountered some corpus positions during its earlier training.
+---
 
-The model uses rate dynamics and backpropagation, not biological learning.
-Treating GABA/glutamate as inhibitory is a modeling assumption. Stockfish
-labels teach chess; the connectome is an architectural constraint.
+## 3. Held-Out Findings & Diagnostics
 
-Further experiments should isolate data quality, endgame coverage and fresh
-mistakes from the current player, use new held-out games and additional
-seeds, and compare longer matched A/B runs. A matched non-connectome control
-is needed before attributing gains to the biological wiring.
+Full tables, confidence intervals, and PGN archives are documented in [`benchmarks/droso-1/README.md`](../../benchmarks/droso-1/README.md). The headline results show an interesting divergence between full-game play and single-position blunder counts:
 
-## Sources
+1. **Head-to-head match vs. `fly-v6`:** Across 64 games from 32 held-out openings (both colours, PUCT 64), DROSO-1 defeated `fly-v6` **37 wins to 17 losses with 10 draws** (**65.6% score**, 95% source-game clustered CI: 56.5%–75.0%).
+2. **Stockfish 19 rating probe:** Across 64 games against Stockfish 19 at `UCI_Elo` 1320 and 1500 (depth 8, 1 thread), DROSO-1 scored **61.7%** (33 W · 13 D · 18 L), corresponding to **1498.5 conditional Elo** (95% bootstrap CI: 1410–1603).
+3. **Single-position move regret:** On the 512 held-out test positions evaluated by a common Stockfish 19 teacher, DROSO-1 committed **61 severe errors** (11.91%) with a mean regret of **85.94 cp**, compared with **56 severe errors** (10.94%) and **82.29 cp** for `fly-v6`. The 95% confidence intervals ($-5.33$ to $+2.07$ percentage points in error rate; $-46.00$ to $+14.04\text{ cp}$ in regret) cross zero—meaning that while DROSO-1 plays substantially stronger full games in head-to-head matches, its raw single-move regret on isolated test diagrams is statistically indistinguishable from `fly-v6`.
+4. **Regression diagnostics:** Longer training improved overall game strength but did not monotonically fix every tactical blind spot. On a small 15-position tactical regression suite, the final 26M model solved 13/15 at PUCT 64 (whereas an intermediate checkpoint had reached 15/15 at PUCT 256), and retained a specific 671-cp blunder position where deeper search failed to override a bad prior.
 
-The graph derives from the FlyWire Consortium's
-[connectivity release 783](https://zenodo.org/records/10676866), with annotations
-and optic-column assignments pinned in
-[graph provenance](../../artifacts/droso-1/graph-provenance.json).
-The [training recipe](recipe.md) and [original experiment evidence](../../benchmarks/droso-1/provenance.json)
-record the implementation and measured results. Session transcripts,
-consultation logs and repeated intermediate commentary are omitted.
+---
+
+## 4. What This Does and Does Not Prove
+
+### Gradients Reach the Connectome, Not Just the Readout
+
+In the frozen 26M checkpoint, **1,780,206 of the 2,700,513 connectome edges (65.9%)** have non-zero learned log-gains $g_e$. Combined with the 10-step recurrent bottleneck between the optic lobes and the readout electrodes, this confirms that backpropagation actively tunes the connectome's internal pathways rather than leaving the graph inert. At the same time, because log-gains are regularized ($10^{-3}\,\overline{g^2}$) and trained at $2\times 10^{-5}$, 90% of edge multipliers $\exp(g_e)$ stay within **0.98×–1.02×** of their biological synapse counts (see [How Much of the Fly Is Actually Left?](../../README.md#wait-how-much-of-the-fly-is-actually-left)).
+
+### Limitations & Next Experiments
+
+1. **No topology-only ablation yet:** Comparing DROSO-1 against `fly-v6` changes the connectome (FlyWire v783 vs. MaleCNS v1.0), the visual mapping (64 vs. 50 squares), the action space (4,168 vs. 4,096 moves), and the training recipe simultaneously. Isolating how much the biological wiring helps (or constrains) chess learning requires matched controls—specifically:
+   - a **frozen-connectome reservoir baseline** ($g_e = 0, b_i = 0$, training only the sensory and readout layers), and
+   - a **degree-preserving random/shuffled graph control** with identical parameter counts and readout architecture.
+2. **Single seed & holdout reuse:** The pilot and scaling run used a single initialization seed (`2026092301`). Because the 512-position `test` split has now been opened and published in `benchmarks/droso-1/`, future model selection should draw a fresh holdout set.
+3. **Historical source-game provenance:** While DROSO-1's training pool excluded held-out roots, legal children, and known source games, some legacy imported shards lacked original game IDs, and `fly-v6` may have seen some test positions during its earlier historical training.
+
+---
+
+## 5. Primary Sources
+
+- **Connectome data:** FlyWire Consortium, [FAFB v783 connectivity release](https://zenodo.org/records/10676866) (CC BY 4.0); exact file hashes and scientific citations are pinned in [`artifacts/droso-1/graph-provenance.json`](../../artifacts/droso-1/graph-provenance.json).
+- **Reproduction & archive:** Step-by-step commands in [`docs/droso-1/recipe.md`](recipe.md); archived experiment manifests and PGNs in [`benchmarks/droso-1/provenance.json`](../../benchmarks/droso-1/provenance.json).

@@ -1,81 +1,65 @@
-# DROSO-1
+# DROSO-1 Standalone Inference Bundle
 
-A pretrained chess model built on the FlyWire v783 connectome, trained from
-scratch. This is the original v10 arm B after **26,000,128 position
-presentations**, released here as DROSO-1 with unchanged learned tensors.
+This directory is a self-contained Python inference package for **DROSO-1**, the connectome-backed chess model running in FlyChess. It includes the FlyWire v783 graph, lossless FP32 weights, the Python inference runtime, and SHA-256 verification fixtures—with no dependency on Stockfish or the training workspace.
+
+---
+
+## Model Specification
 
 | Property | Value |
-| --- | --- |
-| Neurons / directed connections | 134,181 / 2,700,513 |
-| Training steps | 101,563 |
-| Square / global features | 15 / 22 |
-| Policy actions | 4,168; all four promotion types |
-| Default search | PUCT 64, c_puct 1.5 |
-| Value used in search | tanh(current CP / 600), side to move |
-| Stockfish probe | ~1500 conditional Elo; 95% interval 1410–1603 |
-| Held-out match against fly-v6 | 37 wins, 10 draws, 17 losses |
+| :--- | :--- |
+| **Connectome** | FlyWire FAFB v783 (`134,181` neurons · `2,700,513` directed edges · `34,153,566` synapses) |
+| **Training exposure** | `101,563` steps (`26,000,128` position presentations, Arm B) |
+| **Trainable parameters** | `11,690,393` total (`9,551,183` active during search; `2,834,694` inside the connectome) |
+| **Sensory encoding** | `64 × 15` visual square channels ($\to 22,586$ neurons) + `22` global features ($\to 4,885$ neurons) |
+| **Recurrent dynamics** | `10` steps from rest ($\alpha = 0.65$, $\kappa = 0.95$) |
+| **Readout & policy** | `7,526` electrodes $\to$ `BatchNorm1d` $\to$ `512` $\to$ `512` $\to$ `4,168` moves (all 4 promotion types) |
+| **Default search** | PUCT (`64` simulations, $c_{\text{puct}} = 1.5$, value head $\tanh(\text{cp} / 600)$) |
+| **Benchmarks** | **~1500 conditional Elo** (95% CI: 1410–1603) vs. depth-8 Stockfish 19; **37–10–17** vs. `fly-v6` ([details](../../benchmarks/droso-1/README.md)) |
 
-The rating is specific to the benchmark conditions. See the
-[results and PGNs](../../benchmarks/droso-1/README.md) for the full protocol
-and the less conclusive single-move comparison.
+---
 
-## Run
+## Quick Start (Python 3.12)
 
-From the repository root, with Python 3.12:
+From the repository root:
 
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r artifacts/droso-1/requirements.txt
+
 cd artifacts/droso-1
 python -m droso1.bundle --device cpu --moves e2e4 c7c5
 ```
 
-Use `--device cuda` with a compatible CUDA PyTorch installation for faster
-inference. `--fen '...'` sets a position; `--moves` applies UCI moves while
-preserving history. Use `--unknown-clock` when an imported position has no
-reliable halfmove clock. Search defaults to 64 simulations. The command returns
-JSON with the chosen move, legal-move probabilities and current-value output.
+- Pass `--device cuda` if you have a CUDA-enabled PyTorch installation.
+- Set a starting board with `--fen '...'` and apply subsequent moves with `--moves e2e4 c7c5 ...` (preserving repetition history).
+- Pass `--unknown-clock` when evaluating an imported FEN whose 50-move counter is unknown.
+- Adjust the search budget with `--simulations N` (defaults to `64`).
+- The command outputs JSON containing the selected move (`uci` and `san`), current value estimate (`current_cp_tanh`), and unsearched policy probabilities over all legal moves (`legal_policy`).
 
-This directory is a standalone inference bundle. It includes the graph,
-lossless NumPy weights, Python runtime and pinned dependency versions. It does
-not require Stockfish or access to the original research workspace.
+---
 
-## Verify
+## Integrity & Output Verification
+
+Run the built-in verification check from `artifacts/droso-1/`:
 
 ```bash
 python -m droso1.verify
 ```
 
-Verification checks the manifest's SHA-256 hashes, all saved tensor shapes
-through strict loading, fixed anatomy buffers and CPU FP32 outputs against
-reference outputs from the original export. The reference positions cover
-both colours, en passant, promotions and an unknown clock.
+`droso1.verify` validates:
+1. Every file's SHA-256 hash against [`manifest.json`](manifest.json),
+2. Strict state-dict tensor shapes and exact equality of fixed anatomical buffers (`crow`, `col`, `base`, `norm`, `vis_square`, `readout_index`), and
+3. CPU FP32 forward-pass parity (`rtol=1e-5, atol=1e-5`) against the PyTorch reference outputs in `parity.npz` across seven test positions (covering both colours, en passant, promotions, and unknown halfmove clocks).
 
-`verification.json` records release checks, including unchanged tensors,
-reference-output parity and CUDA PUCT move parity. The weights were recompressed
-losslessly from 102,910,550 to 67,587,425 bytes; only the ZIP container changed.
-`manifest.json` identifies the original checkpoint and the current file hashes.
+Release verification results are recorded in [`verification.json`](verification.json). Note that this inference bundle omits optimizer (`AdamW`) and sampler states; to train a new model from scratch, follow the [training recipe](../../docs/droso-1/recipe.md).
 
-The bundle does not contain AdamW, RNG or sampler state for exact training
-resume. To train a new model, use the [recipe](../../docs/droso-1/recipe.md)
-and [training code](../../training/README.md).
+---
 
-## Browser compatibility and data
+## Browser Export & Data Licences
 
-The browser uses this checkpoint through a matching FP32 export in
-`public/data/droso-1/` and the FlyWire graph in `public/data/flywire/`.
-Its encoder and PUCT search implement the same input/action contract.
-See [browser export instructions](../../docs/development.md#updating-the-model).
+The web app runs a matching lossless FP32 binary export of this bundle (`public/data/droso-1/` and `public/data/flywire/`); see the [development guide](../../docs/development.md#4-updating-the-browser-model) for export commands.
 
-The graph is derived from the FlyWire Consortium's
-[release 783](https://zenodo.org/records/10676866), under
-[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Connections below
-five synapses are removed; transmitter signs, neuron grouping and the chess
-sensory interface are modeling choices. [Graph provenance](graph-provenance.json)
-pins the upstream files and relevant scientific citations. Its coverage
-statistics describe the earlier sensory map; the runtime remaps visual
-neurons to cover all 64 squares.
-
-Code and weights use the repository MIT license; the imported runtime retains
-its original [MIT notice](LICENSE). The connectome data keeps its own license.
+- **Code & trained weights:** [MIT](../../LICENSE) (original runtime notice in [`LICENSE`](LICENSE)).
+- **Connectome (`graph.npz`):** Derived from the FlyWire Consortium's [FAFB v783 release](https://zenodo.org/records/10676866) under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Full upstream checksums and scientific citations are recorded in [`graph-provenance.json`](graph-provenance.json).

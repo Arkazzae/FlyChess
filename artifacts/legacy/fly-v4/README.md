@@ -1,41 +1,31 @@
-# fly-v4 (legacy)
+# `fly-v4` (Legacy Prototype)
 
-> **Legacy prototype.** The game now runs [DROSO-1](../../droso-1/README.md); fly-v4 is kept for reference.
-> It was trained on the MaleCNS v1.0 connectome in [`../mcns/`](../mcns/).
+> [!NOTE]
+> **Archived prototype.** FlyChess now runs **[DROSO-1](../../droso-1/README.md)** on the FlyWire v783 connectome. `fly-v4` is an earlier MaleCNS v1.0 prototype ([`../mcns/`](../mcns/)) preceding [`fly-v6`](../fly-v6/README.md).
 
-The prototype before fly-v6.
+| Property | Value |
+| :--- | :--- |
+| **Connectome** | MaleCNS v1.0 (`163,903` neurons · `6,235,682` edges) |
+| **Training steps** | `25,475` (`6,521,600` position presentations) |
+| **Training date** | 18–19 Sep 2026 |
+| **Weights SHA-256** | `8243c4a15481bf96a978442def509f15226d33469b7a9d495f6881939cc736b7` |
+| **Connectome SHA-256** | `e7c39f014763a2d6aa4eb1fe2041820b46d60918020b2301dc8f409990246745` |
 
-| | |
-| --- | --- |
-| Training steps | 25,475 |
-| Position presentations | 6,521,600 (repeats counted) |
-| Trained | 18–19 Sep 2026 |
-| Weights SHA-256 | `8243c4a15481bf96a978442def509f15226d33469b7a9d495f6881939cc736b7` |
-| Connectome SHA-256 | `e7c39f014763a2d6aa4eb1fe2041820b46d60918020b2301dc8f409990246745` |
+## Training Summary
 
-## What changed
+Warm-started from `fly-v3` with three adjustments:
+- Doubled the Lichess evaluation share in the data mixture,
+- Weighted legal-move cross-entropy at 60% of the total policy loss,
+- Added a temporal consistency term across its three value heads.
 
-Warm start from v3. Changes against v3:
-- twice as much Lichess data in the mix;
-- stronger training on legal moves (60% of the move loss counts legal moves
-  only);
-- a consistency term that asks its three value heads to agree over time.
+## Historical Benchmark Results
 
-It learned from:
-- Lichess analyses;
-- Stockfish self-play;
-- its own mistakes (DAgger), weighted 8×.
+Evaluated across 96 games per level against Stockfish 1320 ($\pm 65$ Elo):
 
-## Measured
+| Legacy Level | Record (W · D · L) | Estimated Elo |
+| :--- | :---: | ---: |
+| **Reflex** (policy only) | 9 W · 12 D · 75 L | 1027 |
+| **Planner** ($3 \times 2$ search) | 44 W · 12 D · 40 L | 1334 |
+| **Thinker** ($6 \times 4$ search) | 45 W · 12 D · 39 L | 1342 |
 
-96 games per level against Stockfish 1320 (about ±65):
-
-| Level | Win / draw / loss | Elo |
-| --- | --- | --- |
-| Reflex | 9 / 12 / 75 | 1027 |
-| Planner | 44 / 12 / 40 | 1334 |
-| Thinker | 45 / 12 / 39 | 1342 |
-
-The first probe (32 games) had the Planner at 1397. The larger sample puts it
-near 1330. With search, v4 scored slightly higher than v6, but within the
-±65 margin. Without search, v6 is about 90 points better.
+Without tree search (`Reflex`), `fly-v6` improved on `fly-v4` by roughly 90 Elo; with shallow tree search, both models scored within the $\pm 65$ uncertainty margin.
