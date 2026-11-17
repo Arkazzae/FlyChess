@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useGameStore } from "@/state/game";
+import { moveNumbering } from "@/engine/positions";
 import type { MoveClass } from "@/ai/review";
 
 const MARKS: Partial<Record<MoveClass, string>> = { best: "★", inaccuracy: "?!", mistake: "?", blunder: "??" };
@@ -24,6 +25,7 @@ export function MoveTable({ classes }: { classes?: (MoveClass | null | undefined
   const moves = useGameStore((s) => s.moves);
   const viewPly = useGameStore((s) => s.viewPly);
   const setViewPly = useGameStore((s) => s.setViewPly);
+  const startFen = useGameStore((s) => s.startFen);
   const current = viewPly ?? moves.length;
   const listRef = useRef<HTMLDivElement | null>(null);
 
@@ -41,19 +43,26 @@ export function MoveTable({ classes }: { classes?: (MoveClass | null | undefined
     else if (top + active.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = top + active.offsetHeight - list.clientHeight;
   }, [moves.length, current]);
 
+  // A game set up with Black to move opens its first row with an empty White cell ("1. …  e5").
+  const { first, blackFirst } = moveNumbering(startFen);
+  const offset = blackFirst ? 1 : 0;
   const rows = [];
-  for (let i = 0; i < moves.length; i += 2) rows.push(i);
+  for (let slot = 0; slot < moves.length + offset; slot += 2) rows.push(slot);
   return (
     <div className="move-table" ref={listRef}>
-      {rows.map((i) => (
-        <div className="move-table__row" key={i}>
-          <span className="move-table__no">{i / 2 + 1}.</span>
-          {[i, i + 1].map((ply) => moves[ply] !== undefined ? (
-            <button key={ply} type="button" className={`move-table__move${current === ply + 1 ? " is-current" : ""}${classes?.[ply] ? ` is-${classes[ply]}` : ""}`} onClick={() => setViewPly(ply + 1)}>
-              <San san={moves[ply]} white={ply % 2 === 0} />
-              {classes?.[ply] && MARKS[classes[ply]!] && <span className="move-mark">{MARKS[classes[ply]!]}</span>}
-            </button>
-          ) : <span key={ply} />)}
+      {rows.map((slot) => (
+        <div className="move-table__row" key={slot}>
+          <span className="move-table__no">{first + slot / 2}.</span>
+          {[slot, slot + 1].map((cell) => {
+            const ply = cell - offset;
+            if (ply < 0) return <span key={cell} className="move-table__skip">…</span>;
+            return moves[ply] !== undefined ? (
+              <button key={cell} type="button" className={`move-table__move${current === ply + 1 ? " is-current" : ""}${classes?.[ply] ? ` is-${classes[ply]}` : ""}`} onClick={() => setViewPly(ply + 1)}>
+                <San san={moves[ply]} white={cell % 2 === 0} />
+                {classes?.[ply] && MARKS[classes[ply]!] && <span className="move-mark">{MARKS[classes[ply]!]}</span>}
+              </button>
+            ) : <span key={cell} />;
+          })}
         </div>
       ))}
     </div>

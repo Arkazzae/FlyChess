@@ -14,6 +14,8 @@ describe("fly move selection", () => {
     expect(getFlyTemperature(true, SELF_PLAY_SAMPLED_PLIES - 1)).toBe(1);
     expect(getFlyTemperature(true, SELF_PLAY_SAMPLED_PLIES)).toBe(0);
     expect(getFlyTemperature(true, 60)).toBe(0);
+    // A game from a set-up position has no opening to vary (see openingPly).
+    expect(getFlyTemperature(true, Number.POSITIVE_INFINITY)).toBe(0);
   });
 
   it("gives the Sage a ceiling of 256 simulations and lets it stop when sure", () => {

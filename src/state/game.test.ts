@@ -180,3 +180,78 @@ describe("a game between two bots", () => {
     expect(botMovesFor(state, "b")).toBe(true);
   });
 });
+
+const PHILIDOR = "4k3/8/r7/4PK2/8/8/8/7R b - - 0 1";
+
+describe("a game from a set-up position", () => {
+  beforeEach(() => {
+    useGameStore.getState().reset();
+    useGameStore.getState().newGame({
+      timeControl: { initial: 0, increment: 0 },
+      seats: { w: { id: "thinker" }, b: null },
+      players: PLAYERS,
+      startFen: PHILIDOR,
+    });
+  });
+
+  it("starts from that position with its side to move", () => {
+    const state = useGameStore.getState();
+    expect(state.startFen).toBe(PHILIDOR);
+    expect(state.fen).toBe(PHILIDOR);
+    expect(state.myColor).toBe("b");
+    expect(state.tryMove("a6", "b6")).toMatchObject({ san: "Rb6" });
+  });
+
+  it("takes back to the starting position, not the usual one", () => {
+    useGameStore.getState().tryMove("a6", "b6");
+    useGameStore.getState().applyMove(useGameStore.getState().chess.move("Rh7") as never);
+
+    expect(useGameStore.getState().takeback()).toBe(2);
+    expect(useGameStore.getState().fen).toBe(PHILIDOR);
+    expect(useGameStore.getState().takeback()).toBe(0);
+  });
+
+  it("writes the position into the PGN", () => {
+    useGameStore.getState().tryMove("a6", "b6");
+    const pgn = useGameStore.getState().chess.pgn();
+
+    expect(pgn).toContain('[SetUp "1"]');
+    expect(pgn).toContain(`[FEN "${PHILIDOR}"]`);
+    expect(pgn).toContain("1. ... Rb6");
+  });
+
+  it("goes back to the usual position after the game", () => {
+    useGameStore.getState().reset();
+    expect(useGameStore.getState().startFen).toBe("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+  });
+});
+
+describe("the board before a game", () => {
+  it("previews the chosen start only in the lobby", () => {
+    useGameStore.getState().reset();
+    useGameStore.getState().previewStart(PHILIDOR);
+    expect(useGameStore.getState()).toMatchObject({ phase: "lobby", fen: PHILIDOR, startFen: PHILIDOR });
+
+    useGameStore.getState().newGame({ timeControl: { initial: 0, increment: 0 }, seats: { w: null, b: { id: "thinker" } }, players: PLAYERS });
+    useGameStore.getState().previewStart(PHILIDOR);
+    expect(useGameStore.getState().fen).toBe("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+  });
+});
+
+describe("a test from the Positions tab", () => {
+  const SMOTHERED = "5r1k/6pp/7N/8/2Q5/8/6PP/6K1 w - - 0 1";
+  const SOLVE = { w: { id: "thinker" as const }, b: { id: "stockfish" as const, engine: { skill: 20, depth: 18, moveTimeMs: 1000 } } };
+
+  it("is watched from the fly's side and stops once judged", () => {
+    useGameStore.getState().newGame({ timeControl: { initial: 0, increment: 0 }, seats: SOLVE, players: PLAYERS, startFen: SMOTHERED, solver: "w" });
+    expect(useGameStore.getState()).toMatchObject({ solver: "w", verdict: null, myColor: null, flipped: false });
+
+    useGameStore.getState().setVerdict("failed");
+    expect(useGameStore.getState()).toMatchObject({ phase: "ended", verdict: "failed", result: null });
+    useGameStore.getState().setVerdict("solved");
+    expect(useGameStore.getState().verdict).toBe("failed");
+
+    useGameStore.getState().reset();
+    expect(useGameStore.getState()).toMatchObject({ solver: null, verdict: null });
+  });
+});

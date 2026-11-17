@@ -26,12 +26,15 @@ import {
   type ClockState,
 } from "@/engine/clock";
 import * as ChessEngine from "@/engine/chess";
+import { STANDARD_FEN, type Verdict } from "@/engine/positions";
 import type { Seat } from "@/ai/bots";
 
 export interface GameState {
   // ── Core ──
   chess: Chess;
   phase: GamePhase;
+  /** The position the game started from: the usual one, or one set up on the bot screen. */
+  startFen: string;
   fen: string;
   moves: string[]; // SAN history
   lastMove: { from: Square; to: Square } | null;
@@ -50,6 +53,9 @@ export interface GameState {
 
   // ── Game end ──
   result: GameResult | null;
+  /** A test from the Positions tab: the colour solving it (the fly), and whether it did. */
+  solver: PieceColor | null;
+  verdict: Verdict | null;
   drawOffer: string | null; // userId who offered
 
   // ── Board interaction ──
@@ -75,7 +81,15 @@ export interface GameState {
     timeControl: TimeControl;
     seats: { w: Seat | null; b: Seat | null };
     players: { w: PlayerInfo | null; b: PlayerInfo | null };
+    /** A valid, normalised FEN (see parsePosition); the usual starting position when left out. */
+    startFen?: string;
+    /** The colour that solves the position, for a test from the Positions tab. */
+    solver?: PieceColor | null;
   }) => void;
+  /** Record a test's outcome; a test decided before the game ends (a mate in 2 missed) stops it. */
+  setVerdict: (verdict: Verdict) => void;
+  /** Before a game: show the position it will start from. */
+  previewStart: (fen: string) => void;
   loadPosition: (
     fen: string,
     moves: string[],
@@ -127,7 +141,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   // ── Initial state ──
   chess: new Chess(),
   phase: "lobby",
-  fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+  startFen: STANDARD_FEN,
+  fen: STANDARD_FEN,
   moves: [],
   lastMove: null,
   capturedPieces: { w: [], b: [] },
@@ -138,6 +153,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   clock: createClock(DEFAULT_TC),
   timeControl: DEFAULT_TC,
   result: null,
+  solver: null,
+  verdict: null,
   drawOffer: null,
   selectedSquare: null,
   legalMoves: [],
@@ -152,13 +169,14 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   // ── Actions ──
 
-  newGame: ({ timeControl, seats, players }) => {
-    const chess = new Chess();
+  newGame: ({ timeControl, seats, players, startFen = STANDARD_FEN, solver = null }) => {
+    const chess = new Chess(startFen);
     // With one bot the player has the other side; with none it is a local game for two, with two the player watches.
     const myColor: PieceColor | null = (seats.w === null) === (seats.b === null) ? null : seats.w === null ? "w" : "b";
     set({
       chess,
       phase: "playing",
+      startFen: chess.fen(),
       fen: chess.fen(),
       moves: [],
       lastMove: null,
@@ -170,18 +188,27 @@ export const useGameStore = create<GameState>((set, get) => ({
       clock: createClock(timeControl),
       timeControl,
       result: null,
+      solver,
+      verdict: null,
       drawOffer: null,
       selectedSquare: null,
       legalMoves: [],
       premove: null,
       arrows: [],
       circles: [],
-      flipped: myColor === "b",
+      // A test is watched from the solver's side.
+      flipped: (solver ?? myColor) === "b",
       promotionPending: null,
       evaluation: null,
       viewPly: null,
       paused: false,
     });
+  },
+
+  previewStart: (fen) => {
+    if (get().phase !== "lobby" || get().fen === fen) return;
+    const chess = new Chess(fen);
+    set({ chess, startFen: chess.fen(), fen: chess.fen(), lastMove: null, arrows: [], circles: [] });
   },
 
   loadPosition: (_fen, moves, _savedCapturedPieces) => {
@@ -365,6 +392,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
 
+  setVerdict: (verdict) => {
+    const { phase, clock, verdict: decided } = get();
+    if (decided) return;
+    set(phase === "playing" ? { verdict, phase: "ended", clock: stopClock(clock), paused: false } : { verdict });
+  },
+
   setDrawOffer: (userId) => set({ drawOffer: userId }),
 
   tickClock: () => {
@@ -427,7 +460,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({
       chess: new Chess(),
       phase: "lobby",
-      fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      startFen: STANDARD_FEN,
+      fen: STANDARD_FEN,
       moves: [],
       lastMove: null,
       capturedPieces: { w: [], b: [] },
@@ -438,6 +472,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       clock: createClock(DEFAULT_TC),
       timeControl: DEFAULT_TC,
       result: null,
+      solver: null,
+      verdict: null,
       drawOffer: null,
       selectedSquare: null,
       legalMoves: [],

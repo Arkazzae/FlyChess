@@ -1000,3 +1000,10 @@ details.panel-section[open] summary { margin-bottom: 10px; }
 }
 
 .model-subtitle { margin-left: 8px; font-weight: 500; text-transform: none; letter-spacing: normal; }
+
+/* A test's outcome beside its name in the game tab. */
+.opening-row .verdict { flex: none; margin-left: auto; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 800; background: var(--btn); color: var(--text-2); }
+.opening-row .verdict--solved { background: var(--green); color: #fff; }
+.opening-row .verdict--failed { background: var(--inhibit); color: #fff; }
+.opening-row em { font-style: normal; color: var(--muted); }
+.move-table__skip { padding: 4px 8px; color: var(--muted); }

@@ -17,7 +17,11 @@ export interface SearchLine {
   depth: number;
 }
 
+import { positionCommand } from "@/engine/positions";
+
 export interface SearchRequest {
+  /** The position the game started from. */
+  startFen: string;
   /** Moves from the starting position in UCI, so Stockfish knows the game's repetitions. */
   moves: string[];
   skill: number;
@@ -101,7 +105,7 @@ class StockfishPlayer {
           searching = true;
           worker.postMessage(`setoption name Skill Level value ${request.skill}`);
           worker.postMessage(`setoption name MultiPV value ${request.lines}`);
-          worker.postMessage(request.moves.length ? `position startpos moves ${request.moves.join(" ")}` : "position startpos");
+          worker.postMessage(positionCommand(request.startFen, request.moves));
           const only = request.only?.length ? ` searchmoves ${request.only.join(" ")}` : "";
           worker.postMessage(`go depth ${request.depth} movetime ${request.moveTimeMs}${only}`);
           return;

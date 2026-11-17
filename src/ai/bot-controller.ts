@@ -24,8 +24,11 @@ export interface BotMoveDecision {
 
 export interface MoveRequest {
   fen: string;
+  /** The position the game started from. */
+  startFen: string;
   /** The game's moves so far in UCI, from the starting position. */
   history: string[];
+  /** Half-moves into the opening (see openingPly): infinite for a game set up from another position. */
   halfMoves: number;
   /** The bot's remaining clock time; null when the game is untimed. */
   remainingMs: number | null;
@@ -113,10 +116,10 @@ export class BotController {
     };
   }
 
-  private async engineMove(seat: Seat, { fen, history, remainingMs }: MoveRequest): Promise<Omit<BotMoveDecision, "thinkTime">> {
+  private async engineMove(seat: Seat, { fen, startFen, history, remainingMs }: MoveRequest): Promise<Omit<BotMoveDecision, "thinkTime">> {
     const config = seat.engine!;
     const result = await stockfishPlayer.search({
-      moves: history, skill: config.skill, depth: config.depth, lines: 1, moveTimeMs: getEngineMoveTime(config.moveTimeMs, remainingMs),
+      startFen, moves: history, skill: config.skill, depth: config.depth, lines: 1, moveTimeMs: getEngineMoveTime(config.moveTimeMs, remainingMs),
     });
     if (!result.best) throw new Error("Stockfish found no move.");
     const toWhite = sideToMove(fen) === "w" ? 1 : -1;
@@ -129,9 +132,9 @@ export class BotController {
     };
   }
 
-  private async characterMove(seat: Seat, { fen, history, halfMoves, remainingMs }: MoveRequest): Promise<Omit<BotMoveDecision, "thinkTime">> {
+  private async characterMove(seat: Seat, { fen, startFen, history, halfMoves, remainingMs }: MoveRequest): Promise<Omit<BotMoveDecision, "thinkTime">> {
     const { style } = getCharacter(seat.id)!;
-    const search = { moves: history, skill: 20, depth: style.depth, moveTimeMs: getEngineMoveTime(style.moveTimeMs, remainingMs) };
+    const search = { startFen, moves: history, skill: 20, depth: style.depth, moveTimeMs: getEngineMoveTime(style.moveTimeMs, remainingMs) };
     const result = await stockfishPlayer.search({ ...search, lines: style.lines });
     const candidates: Candidate[] = result.lines.map((line) => ({ uci: line.uci, score: scoreOf(line) }));
     // Stockfish rarely ranks an early queen sortie among its best lines; a queen lover looks at them anyway.

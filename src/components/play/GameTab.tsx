@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { BotPortrait } from "@/components/BotPortrait";
 import { isSpectating, useGameStore } from "@/state/game";
 import { useChatStore } from "@/state/chat";
@@ -9,8 +10,18 @@ import { requestHint } from "@/ai/hint";
 import { useOpeningName } from "@/hooks/useOpeningName";
 import { backToLobby, downloadPgn, hasFly, reasonText, rematch, resign } from "@/game/session";
 import { useTranslation } from "@/i18n";
+import { presetGoal, startLabel } from "@/engine/positions";
 import { MoveTable } from "./MoveTable";
 import { IconBrain, IconBulb, IconChevron, IconDownload, IconFlag, IconFlip, IconGear, IconUndo } from "@/components/shell/Icons";
+
+/** The game's starting position by name: the usual one, a test position, a Chess960 start or a set-up one. */
+function StartName({ fen }: { fen: string }) {
+  const { t } = useTranslation();
+  const label = useMemo(() => startLabel(fen), [fen]);
+  if (label.kind === "preset") return <>{t(`preset.${label.id}`)} <em>· {t(`preset.${label.id}.goal`)}</em></>;
+  if (label.kind === "chess960") return <>{t("start.chess960Number", { n: label.number })}</>;
+  return <>{t(label.kind === "custom" ? "start.customPosition" : "game.startPosition")}</>;
+}
 
 function BrainStrip() {
   const status = useFlyStore((s) => s.status);
@@ -52,7 +63,10 @@ export function GameTab() {
   const hintLoading = useUiStore((s) => s.hintLoading);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const showToast = useUiStore((s) => s.showToast);
-  const opening = useOpeningName(fen);
+  const startFen = useGameStore((s) => s.startFen);
+  const solver = useGameStore((s) => s.solver);
+  const verdict = useGameStore((s) => s.verdict);
+  const opening = useOpeningName(fen, startFen);
   const turn = useGameStore((s) => (s.fen.split(" ")[1] === "b" ? "b" : "w"));
   const { t } = useTranslation();
   const last = log.at(-1);
@@ -82,7 +96,10 @@ export function GameTab() {
       </div>
       {hasFly(seats) && <BrainStrip />}
       <div className="opening-row">
-        <span>{opening ? <><b>{opening.eco}</b> {opening.name}</> : t("game.startPosition")}</span>
+        <span>{opening ? <><b>{opening.eco}</b> {opening.name}</> : <StartName fen={startFen} />}</span>
+        {solver && presetGoal(startFen) && (
+          <span className={`verdict verdict--${verdict ?? "pending"}`} role="status">{t(`verdict.${verdict ?? "pending"}`)}</span>
+        )}
       </div>
       <MoveTable />
       {phase === "ended" && result && (
@@ -96,7 +113,7 @@ export function GameTab() {
           <>
             <button type="button" className="btn btn--wide" onClick={backToLobby}>{t("game.newGame")}</button>
             <button type="button" className="btn btn--wide" onClick={() => { useUiStore.getState().setPanelTab("review"); setViewPly(0); }}>{t("panel.review")}</button>
-            <button type="button" className="btn btn--green btn--wide" onClick={rematch}>{t("game.rematch")}</button>
+            <button type="button" className="btn btn--green btn--wide" onClick={rematch}>{t(solver ? "positions.again" : "game.rematch")}</button>
           </>
         ) : spectating ? (
           <>

@@ -12,6 +12,7 @@ import { CancelledSearch } from "@/ai/stockfish-player";
 import { seenPositions } from "@/ai/fly/planner";
 import { getTimeRemaining, isFlagged, isUnlimited, startClock } from "@/engine/clock";
 import { isFlyMirror } from "@/game/session";
+import { openingPly } from "@/engine/positions";
 import { playMoveSound } from "@/sounds";
 import type { Move, PieceColor, Square } from "@/engine/types";
 
@@ -126,8 +127,9 @@ export function useBotMove() {
           fen: requestedFen,
           decision: controller.getMove({
             fen: requestedFen,
+            startFen: state.startFen,
             history: history.map((move) => `${move.from}${move.to}${move.promotion ?? ""}`),
-            halfMoves: state.moves.length,
+            halfMoves: openingPly(state.startFen, state.moves.length),
             remainingMs: isUnlimited(state.timeControl) ? null : getTimeRemaining(state.clock, botColor),
             seen: seenPositions(history, requestedFen),
           }),
@@ -153,7 +155,7 @@ export function useBotMove() {
         baseDelayMs: decision.thinkTime,
         remainingMs: getTimeRemaining(latestState.clock, botColor),
         timeControl: latestState.timeControl,
-        halfMoves: latestState.moves.length,
+        halfMoves: openingPly(latestState.startFen, latestState.moves.length),
       });
       // Two fast bots would otherwise move faster than anyone can follow.
       if (spectating && isUnlimited(latestState.timeControl)) {

@@ -137,7 +137,8 @@ export function ReviewTab() {
       <div className={`review-move${move ? ` is-${move.cls}` : ""}`}>
         {played ? (
           <>
-            <strong>{Math.ceil(current / 2)}.{played.color === "b" ? ".." : ""} {played.san}</strong>
+            {/* The move number comes from the position, so games set up with Black to move or later on count right. */}
+            <strong>{played.before.split(" ")[5]}.{played.color === "b" ? ".." : ""} {played.san}</strong>
             <span>{spectating ? t(played.color === "w" ? "review.byWhite" : "review.byBlack")
               : !mover ? t("review.byYou")
               : getOpponent(mover.id).kind === "fly" ? t("review.byFly") : t("review.byBot", { name: getOpponent(mover.id).name })}</span>
