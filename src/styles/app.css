@@ -404,7 +404,8 @@ button:focus-visible, select:focus-visible, input:focus-visible, canvas:focus-vi
   box-shadow: 0 3px 0 var(--btn-shadow);
   cursor: pointer;
 }
-.toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; color: var(--text-2); padding: 3px 0; }
+/* Positioned, so the hidden checkbox stays inside its label: otherwise it sits where an unscrolled panel would put it and stretches the page. */
+.toggle { position: relative; display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; color: var(--text-2); padding: 3px 0; }
 .toggle input { position: absolute; opacity: 0; pointer-events: none; }
 .toggle__track { width: 34px; height: 20px; border-radius: 10px; background: #4b4845; position: relative; flex: none; transition: background 0.15s; }
 .toggle__track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform 0.15s; }
