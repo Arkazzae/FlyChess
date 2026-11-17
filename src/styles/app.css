@@ -412,7 +412,8 @@ button:focus-visible, select:focus-visible, input:focus-visible, canvas:focus-vi
 .toggle input:checked + .toggle__track { background: var(--green); }
 .toggle input:checked + .toggle__track::after { transform: translateX(14px); }
 .toggle input:focus-visible + .toggle__track { outline: 2px solid var(--green-hi); outline-offset: 2px; }
-.bot-select__footer { margin-top: auto; padding: 14px 20px 16px; background: var(--panel-head); display: flex; flex-direction: column; gap: 12px; }
+/* The start buttons stay in view while the bot screen scrolls (a long Positions gallery, a short laptop). */
+.bot-select__footer { position: sticky; bottom: 0; z-index: 5; margin-top: auto; padding: 14px 20px 16px; background: var(--panel-head); box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.35); display: flex; flex-direction: column; gap: 12px; }
 .btn-play {
   width: 100%;
   padding: 12px;
