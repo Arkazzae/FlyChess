@@ -8,12 +8,13 @@
 import { create } from "zustand";
 import { DEFAULT_ENGINE, getOpponent, normalizeEngine, type EngineConfig, type OpponentId } from "@/ai/bots";
 import type { PieceColor, Square, TimeControl } from "@/engine/types";
+import { PICKS, randomChess960, type PositionPick } from "@/engine/positions";
 
 export type View = "play" | "brain";
 export type PanelTab = "game" | "brain" | "review";
 export type SideChoice = "w" | "random" | "b";
-/** Play against a bot, or pair two bots and watch. */
-export type PlayMode = "vsBot" | "match";
+/** Play against a bot, pair two bots and watch, or play a bot from a chosen position. */
+export type PlayMode = "vsBot" | "match" | "positions";
 /** Engine settings are kept per place: the opponent in a game against the player, and each side of a match. */
 export type EngineSlot = "vs" | PieceColor;
 
@@ -36,6 +37,8 @@ interface Saved {
   mode: PlayMode;
   /** The bot the player faces. */
   opponent: OpponentId;
+  /** The fly level picked last: it solves (or defends) in the Positions tab. */
+  fly: OpponentId;
   /** The two bots of a match. */
   match: Record<PieceColor, OpponentId>;
   engine: Record<EngineSlot, EngineConfig>;
@@ -43,6 +46,12 @@ interface Saved {
   timeId: string;
   showThoughts: boolean;
   showEval: boolean;
+  /** The position picked in the Positions tab. */
+  positionPick: PositionPick;
+  /** The Chess960 start number (0–959). */
+  chess960: number;
+  /** The FEN as typed or pasted; checked whenever it is used. */
+  customFen: string;
 }
 
 const KEY = "fly-chess-thinker:ui:v2";
@@ -55,11 +64,17 @@ function load(): Partial<Saved> {
     const { level, ...rest } = saved;
     const legacy = getOpponent(level).id;
     const opponent = getOpponent(saved.opponent ?? level).id;
+    const fly = [saved.fly, opponent].find((id) => !!id && getOpponent(id).id === id && getOpponent(id).kind === "fly");
     const engine = (saved.engine ?? {}) as Partial<Record<EngineSlot, unknown>>;
+    const chess960 = Number(saved.chess960);
     return {
       ...rest,
-      mode: saved.mode === "match" || saved.mode === "flyVsFly" ? "match" : "vsBot",
+      positionPick: PICKS.includes(saved.positionPick as PositionPick) ? saved.positionPick : undefined,
+      chess960: Number.isInteger(chess960) && chess960 >= 0 && chess960 < 960 ? chess960 : undefined,
+      customFen: typeof saved.customFen === "string" ? saved.customFen.slice(0, 200) : undefined,
+      mode: saved.mode === "match" || saved.mode === "flyVsFly" ? "match" : saved.mode === "positions" ? "positions" : "vsBot",
       opponent,
+      fly,
       match: { w: getOpponent(saved.match?.w ?? legacy).id, b: getOpponent(saved.match?.b ?? legacy).id },
       engine: { vs: normalizeEngine(engine.vs), w: normalizeEngine(engine.w), b: normalizeEngine(engine.b) },
     };
@@ -96,6 +111,10 @@ interface UiState extends Saved {
   setTimeId: (id: string) => void;
   setShowThoughts: (show: boolean) => void;
   setShowEval: (show: boolean) => void;
+  setPositionPick: (pick: PositionPick) => void;
+  /** Deal a new Chess960 start. */
+  shuffleChess960: () => void;
+  setCustomFen: (fen: string) => void;
   setHint: (hint: { from: Square; to: Square } | null) => void;
   setHintLoading: (loading: boolean) => void;
   showToast: (text: string) => void;
@@ -106,14 +125,15 @@ const initial = load();
 
 export const useUiStore = create<UiState>((set, get) => {
   const persist = () => {
-    const { mode, opponent, match, engine, side, timeId, showThoughts, showEval } = get();
-    save({ mode, opponent, match, engine, side, timeId, showThoughts, showEval });
+    const { mode, opponent, fly, match, engine, side, timeId, showThoughts, showEval, positionPick, chess960, customFen } = get();
+    save({ mode, opponent, fly, match, engine, side, timeId, showThoughts, showEval, positionPick, chess960, customFen });
   };
   return {
     view: "play",
     panelTab: "game",
     mode: initial.mode ?? "vsBot",
     opponent: initial.opponent ?? "thinker",
+    fly: initial.fly ?? "thinker",
     match: initial.match ?? { w: "thinker", b: "thinker" },
     engine: initial.engine ?? { vs: DEFAULT_ENGINE, w: DEFAULT_ENGINE, b: DEFAULT_ENGINE },
     matchSide: "w",
@@ -121,6 +141,9 @@ export const useUiStore = create<UiState>((set, get) => {
     timeId: initial.timeId ?? "none",
     showThoughts: initial.showThoughts ?? false,
     showEval: initial.showEval ?? true,
+    positionPick: initial.positionPick ?? PICKS[0],
+    chess960: initial.chess960 ?? randomChess960(),
+    customFen: initial.customFen ?? "",
     hint: null,
     hintLoading: false,
     toast: null,
@@ -131,6 +154,7 @@ export const useUiStore = create<UiState>((set, get) => {
     choose: (id) => {
       const { mode, match, matchSide } = get();
       set(mode === "match" ? { match: { ...match, [matchSide]: id } } : { opponent: id });
+      if (getOpponent(id).kind === "fly") set({ fly: id });
       persist();
     },
     setMatchSide: (matchSide) => set({ matchSide }),
@@ -147,6 +171,14 @@ export const useUiStore = create<UiState>((set, get) => {
     setTimeId: (timeId) => { set({ timeId }); persist(); },
     setShowThoughts: (showThoughts) => { set({ showThoughts }); persist(); },
     setShowEval: (showEval) => { set({ showEval }); persist(); },
+    setPositionPick: (positionPick) => { set({ positionPick }); persist(); },
+    shuffleChess960: () => {
+      let chess960 = randomChess960();
+      while (chess960 === get().chess960) chess960 = randomChess960();
+      set({ chess960 });
+      persist();
+    },
+    setCustomFen: (customFen) => { set({ customFen: customFen.slice(0, 200) }); persist(); },
     setHint: (hint) => set({ hint }),
     setHintLoading: (hintLoading) => set({ hintLoading }),
     showToast: (text) => set({ toast: { id: Date.now(), text } }),

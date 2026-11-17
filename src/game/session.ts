@@ -9,18 +9,42 @@ import { getFlyEngine } from "@/ai/fly/engine";
 import { triggerChat } from "@/ai/bot-chat";
 import { getOpponent, seatFor, type Seat } from "@/ai/bots";
 import { resumeAudio } from "@/sounds";
-import type { GameResult, PieceColor, PlayerInfo } from "@/engine/types";
+import type { GameResult, PieceColor, PlayerInfo, TimeControl } from "@/engine/types";
+import { chosenStart, sideToMove, STANDARD_FEN } from "@/engine/positions";
 import { t } from "@/i18n";
 
 type Seats = Record<PieceColor, Seat | null>;
+
+/** Stockfish at full strength: the defence (or the attack) the fly's solution must stand up to. */
+const DEFENDER: Seat = { id: "stockfish", engine: { skill: 20, depth: 18, moveTimeMs: 1000 } };
+
+/** The two sides of a test: the fly on the side to move, Stockfish on the other. */
+export function solveSeats(fen: string, fly: Seat["id"]): Seats {
+  return sideToMove(fen) === "w" ? { w: { id: fly }, b: DEFENDER } : { w: DEFENDER, b: { id: fly } };
+}
 
 /** The seats picked on the bot screen; null is the player's side, rolled now when "random" unless given. */
 export function lobbySeats(playerSide?: PieceColor): Seats {
   const ui = useUiStore.getState();
   if (ui.mode === "match") return { w: seatFor(ui.match.w, ui.engine.w), b: seatFor(ui.match.b, ui.engine.b) };
+  if (ui.mode === "positions") return solveSeats(lobbyStart() ?? STANDARD_FEN, ui.fly);
   const bot = seatFor(ui.opponent, ui.engine.vs);
   const side: PieceColor = playerSide ?? (ui.side === "random" ? (Math.random() < 0.5 ? "w" : "b") : ui.side);
   return side === "w" ? { w: null, b: bot } : { w: bot, b: null };
+}
+
+/** The position picked on the bot screen, or null while a pasted FEN cannot be played. */
+export function lobbyStart(): string | null {
+  const choice = chosenStart(useUiStore.getState());
+  return choice.ok ? choice.fen : null;
+}
+
+/** The fly solves `fen` (the position picked in the Positions tab by default) against Stockfish; the player watches. */
+export function startSolve(fen: string | null = lobbyStart()): void {
+  if (!fen) return;
+  const { fly } = useUiStore.getState();
+  // No clock: the fly gets its full search on every move.
+  startGame(solveSeats(fen, fly), fen, { initial: 0, increment: 0 }, sideToMove(fen));
 }
 
 /** Both bots are the fly (at any search budget), so its own mirror lines and two brains apply. */
@@ -39,8 +63,14 @@ function playerInfo(seat: Seat | null): PlayerInfo {
   return { userId: opponent.id, username: opponent.name, avatarUrl: opponent.avatarUrl };
 }
 
-/** Start a game with the choices from the bot screen, or with the given seats for a rematch. */
-export function startGame(seats: Seats = lobbySeats()): void {
+/** Start a game with the choices from the bot screen, or with the given seats and position for a rematch. */
+export function startGame(
+  seats: Seats = lobbySeats(),
+  startFen: string | null = lobbyStart(),
+  timeControl: TimeControl = timeOption(useUiStore.getState().timeId).tc,
+  solver: PieceColor | null = null,
+): void {
+  if (!startFen) return;
   resumeAudio();
   const ui = useUiStore.getState();
   // The fly's first thought waits for its brain to be in place.
@@ -49,16 +79,20 @@ export function startGame(seats: Seats = lobbySeats()): void {
   ui.setHint(null);
   ui.setPanelTab("game");
   useGameStore.getState().newGame({
-    timeControl: timeOption(ui.timeId).tc,
+    timeControl,
     seats,
     players: { w: playerInfo(seats.w), b: playerInfo(seats.b) },
+    startFen,
+    solver,
   });
 }
 
 export function rematch(): void {
-  const { seats } = useGameStore.getState();
-  // Like a rematch on a chess site: colours swap, for the player and in a match alike.
-  startGame({ w: seats.b, b: seats.w });
+  const { seats, startFen, solver } = useGameStore.getState();
+  // A test is simply run again: the fly keeps the side to move.
+  if (solver) return startSolve(startFen);
+  // Like a rematch on a chess site: colours swap, for the player and in a match alike; the position stays.
+  startGame({ w: seats.b, b: seats.w }, startFen);
 }
 
 export function backToLobby(): void {

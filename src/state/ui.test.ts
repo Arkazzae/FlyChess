@@ -98,3 +98,54 @@ describe("match pairing", () => {
     expect(useUiStore.getState().engine.vs.skill).toBe(0);
   });
 });
+
+describe("saved positions tab", () => {
+  it("remembers the tab, the picked position, a pasted FEN and a Chess960 start", async () => {
+    const storage = mockStorage(JSON.stringify({ mode: "positions", positionPick: "custom", chess960: 42, customFen: "8/8/8/4k3/8/8/8/R3K3 w - - 0 1" }));
+    const { useUiStore } = await import("./ui");
+    const ui = useUiStore.getState;
+
+    expect(ui()).toMatchObject({ mode: "positions", positionPick: "custom", chess960: 42, customFen: "8/8/8/4k3/8/8/8/R3K3 w - - 0 1" });
+    ui().setPositionPick("chess960");
+    ui().shuffleChess960();
+    expect(ui().chess960).not.toBe(42);
+    expect(ui().chess960).not.toBe(518);
+    expect(JSON.parse(storage.get(STORAGE_KEY)!)).toMatchObject({ positionPick: "chess960", chess960: ui().chess960 });
+  });
+
+  it.each(['{"positionPick":"mateIn9"}', '{"chess960":960}', '{"chess960":"x"}', '{"customFen":7}', "{broken"])
+    ("falls back to the first test position for bad saved values: %s", async (settings) => {
+      mockStorage(settings);
+      const { useUiStore } = await import("./ui");
+      const state = useUiStore.getState();
+
+      expect(state.positionPick).toBe("backRank");
+      expect(Number.isInteger(state.chess960) && state.chess960 >= 0 && state.chess960 < 960).toBe(true);
+      expect(typeof state.customFen).toBe("string");
+    });
+});
+
+describe("the fly of the Positions tab", () => {
+  it("is the fly level picked last, even when a Stockfish bot is seated afterwards", async () => {
+    const storage = mockStorage("{}");
+    const { useUiStore } = await import("./ui");
+    const ui = useUiStore.getState;
+
+    expect(ui().fly).toBe("thinker");
+    ui().choose("scout");
+    ui().choose("stockfish");
+    expect(ui()).toMatchObject({ opponent: "stockfish", fly: "scout" });
+    expect(JSON.parse(storage.get(STORAGE_KEY)!).fly).toBe("scout");
+  });
+
+  it("comes back from saved settings, or from a saved fly opponent", async () => {
+    mockStorage(JSON.stringify({ opponent: "tactician" }));
+    expect((await import("./ui")).useUiStore.getState().fly).toBe("tactician");
+    vi.resetModules();
+    mockStorage(JSON.stringify({ opponent: "marvin", fly: "sage" }));
+    expect((await import("./ui")).useUiStore.getState().fly).toBe("sage");
+    vi.resetModules();
+    mockStorage(JSON.stringify({ opponent: "marvin", fly: "nelsen" }));
+    expect((await import("./ui")).useUiStore.getState().fly).toBe("thinker");
+  });
+});

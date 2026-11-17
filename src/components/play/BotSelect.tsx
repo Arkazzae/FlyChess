@@ -6,10 +6,12 @@ import { getFlyEngine } from "@/ai/fly/engine";
 import { useFlyStore } from "@/state/fly";
 import { useSettingsStore } from "@/state/settings";
 import { TIME_OPTIONS, useUiStore, type EngineSlot, type PlayMode, type SideChoice } from "@/state/ui";
-import { startGame } from "@/game/session";
+import { startGame, startSolve } from "@/game/session";
+import { chosenStart } from "@/engine/positions";
 import type { PieceColor } from "@/engine/types";
+import { PositionGallery } from "./PositionGallery";
 
-const MODES: PlayMode[] = ["vsBot", "match"];
+const MODES: PlayMode[] = ["vsBot", "match", "positions"];
 const SIDES: SideChoice[] = ["w", "random", "b"];
 const COLORS: PieceColor[] = ["w", "b"];
 const FLIES = OPPONENTS.filter((opponent) => opponent.kind === "fly");
@@ -91,6 +93,7 @@ export function BotSelect() {
   const mode = useUiStore((s) => s.mode);
   const setMode = useUiStore((s) => s.setMode);
   const opponentId = useUiStore((s) => s.opponent);
+  const flyId = useUiStore((s) => s.fly);
   const match = useUiStore((s) => s.match);
   const matchSide = useUiStore((s) => s.matchSide);
   const setMatchSide = useUiStore((s) => s.setMatchSide);
@@ -107,12 +110,20 @@ export function BotSelect() {
   const setShowEval = useUiStore((s) => s.setShowEval);
   const flyChat = useSettingsStore((s) => s.flyChat);
   const status = useFlyStore((s) => s.status);
+  const positionPick = useUiStore((s) => s.positionPick);
+  const chess960 = useUiStore((s) => s.chess960);
+  const customFen = useUiStore((s) => s.customFen);
+  const startOk = useMemo(() => chosenStart({ mode, positionPick, chess960, customFen }).ok, [mode, positionPick, chess960, customFen]);
   const { t } = useTranslation();
 
   const isMatch = mode === "match";
+  const isPositions = mode === "positions";
+  // Test positions and pasted ones are solved; a Chess960 start is simply played.
+  const task = positionPick === "chess960" ? "positions.botPlays" : "positions.botSolves";
   const slot: EngineSlot = isMatch ? matchSide : "vs";
   const selectedId: OpponentId = isMatch ? match[matchSide] : opponentId;
-  const opponent = getOpponent(opponentId);
+  // The Positions tab is the fly's test: it seats the fly level picked last, not a Stockfish bot.
+  const opponent = getOpponent(mode === "positions" ? flyId : opponentId);
   const pair = COLORS.map((color) => getOpponent(match[color]));
   const flyMirror = pair.every((bot) => bot.kind === "fly");
   const seated = isMatch ? pair : [opponent];
@@ -202,57 +213,73 @@ export function BotSelect() {
         </div>
       )}
 
-      <div className="bot-select__section">
-        <h3>DROSO-1 <span className="model-subtitle">{t("select.modelStyles")}</span></h3>
-        <div className="bot-grid" role="radiogroup" aria-label={t("select.levelAria")}>
-          <BotCard featured opponent={FEATURED} selected={FEATURED.id === selectedId} subtitle={FEATURED.short} onSelect={() => pick(FEATURED.id)} />
-          {MAIN_FLIES.map((item) => <BotCard key={item.id} opponent={item} selected={item.id === selectedId} subtitle={item.short} onSelect={() => pick(item.id)} />)}
-        </div>
-        <p className="bot-select__note">{t("select.ratingNote")}</p>
-        <details ref={lab} className="bot-lab">
-          <summary>{t("select.labTitle")} <span className="model-subtitle">{t("select.labHint")}</span></summary>
-          <div className="bot-grid" role="radiogroup" aria-label={t("select.labTitle")}>
-            {EXPERIMENTAL.map((item) => <BotCard key={item.id} opponent={item} selected={item.id === selectedId} subtitle={item.short} onSelect={() => pick(item.id)} />)}
+      {isPositions && (
+        <>
+          <PositionGallery />
+          <div className="bot-select__section">
+            <p className="bot-select__note">{t("positions.note", { name: opponent.name })}</p>
           </div>
-          <p className="bot-lab__note">{t("select.labNote")}</p>
-        </details>
-      </div>
+        </>
+      )}
 
-      <div className="bot-select__section">
-        <h3>Stockfish <span className="model-subtitle">{t("select.familyStyles")}</span></h3>
-        <div className="bot-grid" role="radiogroup" aria-label={t("select.familyAria")}>
-          {STOCKFISH_FAMILY.map((item) => <BotCard key={item.id} opponent={item} selected={item.id === selectedId} subtitle={subtitle(item)} onSelect={() => pick(item.id)} />)}
-        </div>
-        {selectedId === "stockfish"
-          ? <EngineSettings slot={slot} config={engine[slot]} />
-          : <p className="bot-select__note">{t("select.familyNote")}</p>}
-      </div>
-
-      {isMatch ? (
-        <div className="bot-select__section">
-          <h3>{t("select.selfTitle")}</h3>
-          <p className="bot-select__self">{t(flyMirror ? "select.selfNote" : "select.watchNote")}</p>
-        </div>
-      ) : (
-        <div className="bot-select__section">
-          <h3>{t("select.playAs")}</h3>
-          <div className="side-pick" role="radiogroup" aria-label={t("select.colorAria")}>
-            {SIDES.map((item) => (
-              <button key={item} type="button" role="radio" aria-checked={side === item} className={side === item ? "is-selected" : ""} onClick={() => setSide(item)} title={t(`side.${item}`)} aria-label={t(`side.${item}`)}>
-                <KingIcon side={item} />
-              </button>
-            ))}
+      {!isPositions && (
+        <>
+          <div className="bot-select__section">
+            <h3>DROSO-1 <span className="model-subtitle">{t("select.modelStyles")}</span></h3>
+            <div className="bot-grid" role="radiogroup" aria-label={t("select.levelAria")}>
+              <BotCard featured opponent={FEATURED} selected={FEATURED.id === selectedId} subtitle={FEATURED.short} onSelect={() => pick(FEATURED.id)} />
+              {MAIN_FLIES.map((item) => <BotCard key={item.id} opponent={item} selected={item.id === selectedId} subtitle={item.short} onSelect={() => pick(item.id)} />)}
+            </div>
+            <p className="bot-select__note">{t("select.ratingNote")}</p>
+            <details ref={lab} className="bot-lab">
+              <summary>{t("select.labTitle")} <span className="model-subtitle">{t("select.labHint")}</span></summary>
+              <div className="bot-grid" role="radiogroup" aria-label={t("select.labTitle")}>
+                {EXPERIMENTAL.map((item) => <BotCard key={item.id} opponent={item} selected={item.id === selectedId} subtitle={item.short} onSelect={() => pick(item.id)} />)}
+              </div>
+              <p className="bot-lab__note">{t("select.labNote")}</p>
+            </details>
           </div>
-        </div>
+
+          <div className="bot-select__section">
+            <h3>Stockfish <span className="model-subtitle">{t("select.familyStyles")}</span></h3>
+            <div className="bot-grid" role="radiogroup" aria-label={t("select.familyAria")}>
+              {STOCKFISH_FAMILY.map((item) => <BotCard key={item.id} opponent={item} selected={item.id === selectedId} subtitle={subtitle(item)} onSelect={() => pick(item.id)} />)}
+            </div>
+            {selectedId === "stockfish"
+              ? <EngineSettings slot={slot} config={engine[slot]} />
+              : <p className="bot-select__note">{t("select.familyNote")}</p>}
+          </div>
+
+          {isMatch ? (
+            <div className="bot-select__section">
+              <h3>{t("select.selfTitle")}</h3>
+              <p className="bot-select__self">{t(flyMirror ? "select.selfNote" : "select.watchNote")}</p>
+            </div>
+          ) : (
+            <div className="bot-select__section">
+              <h3>{t("select.playAs")}</h3>
+              <div className="side-pick" role="radiogroup" aria-label={t("select.colorAria")}>
+                {SIDES.map((item) => (
+                  <button key={item} type="button" role="radio" aria-checked={side === item} className={side === item ? "is-selected" : ""} onClick={() => setSide(item)} title={t(`side.${item}`)} aria-label={t(`side.${item}`)}>
+                    <KingIcon side={item} />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <div className="bot-select__section bot-select__row">
-        <label className="select">
-          <span>{t("select.time")}</span>
-          <select value={timeId} onChange={(e) => setTimeId(e.target.value)}>
-            {TIME_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.id === "none" ? t("time.none") : option.label}</option>)}
-          </select>
-        </label>
+        {/* A test has no clock: the fly gets its full search on every move. */}
+        {!isPositions && (
+          <label className="select">
+            <span>{t("select.time")}</span>
+            <select value={timeId} onChange={(e) => setTimeId(e.target.value)}>
+              {TIME_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.id === "none" ? t("time.none") : option.label}</option>)}
+            </select>
+          </label>
+        )}
         {needsFly && (
           <label className="toggle">
             <input type="checkbox" checked={showThoughts} onChange={(e) => setShowThoughts(e.target.checked)} />
@@ -268,9 +295,15 @@ export function BotSelect() {
       </div>
 
       <div className="bot-select__footer">
-        <button type="button" className="btn-play" onClick={() => startGame()} disabled={needsFly && status === "error"}>
-          {t(isMatch ? "select.watch" : "select.play")}
-        </button>
+        {isPositions ? (
+          <button type="button" className="btn-play" onClick={() => startSolve()} disabled={status === "error" || !startOk}>
+            {t(task, { name: opponent.name })}
+          </button>
+        ) : (
+          <button type="button" className="btn-play" onClick={() => startGame()} disabled={needsFly && status === "error"}>
+            {t(isMatch ? "select.watch" : "select.play")}
+          </button>
+        )}
       </div>
     </div>
   );

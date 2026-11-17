@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { isSpectating, useGameStore } from "@/state/game";
 import { useUiStore } from "@/state/ui";
+import { chosenStart, sideToMove } from "@/engine/positions";
+import { lobbyStart } from "@/game/session";
 import { Board } from "@/components/Board/Board";
 import { BoardOverlays } from "./BoardOverlays";
 import { GameOverDialog } from "./GameOverDialog";
@@ -17,6 +19,9 @@ export function PlayPage() {
   const mode = useUiStore((s) => s.mode);
   const side = useUiStore((s) => s.side);
   const showEval = useUiStore((s) => s.showEval);
+  const positionPick = useUiStore((s) => s.positionPick);
+  const chess960 = useUiStore((s) => s.chess960);
+  const customFen = useUiStore((s) => s.customFen);
 
   // On a phone the player scrolls down to the Play button; the game itself must start with the
   // board in view, and so must the bot screen after a game.
@@ -24,10 +29,20 @@ export function PlayPage() {
     document.querySelector(".app__main")?.scrollTo({ top: 0 });
   }, [phase === "lobby"]);
 
-  // Before the game the board faces the colour the player picked; White when two bots play.
+  // Before the game the board faces the colour the player picked; White when two bots play; in the
+  // Positions tab the side to move, which the fly will solve from.
   useEffect(() => {
-    if (phase === "lobby") useGameStore.setState({ flipped: mode === "vsBot" && side === "b" });
-  }, [phase, mode, side]);
+    if (phase !== "lobby") return;
+    const flipped = mode === "positions" ? sideToMove(lobbyStart() ?? "") === "b" : mode === "vsBot" && side === "b";
+    useGameStore.setState({ flipped });
+  }, [phase, mode, side, positionPick, chess960, customFen]);
+
+  // Before the game the board shows where it will start; while a pasted FEN is unplayable it keeps the last good one.
+  useEffect(() => {
+    if (phase !== "lobby") return;
+    const choice = chosenStart({ mode, positionPick, chess960, customFen });
+    if (choice.ok) useGameStore.getState().previewStart(choice.fen);
+  }, [phase, mode, positionPick, chess960, customFen]);
 
   const top = flipped ? "w" : "b";
   const bottom = flipped ? "b" : "w";

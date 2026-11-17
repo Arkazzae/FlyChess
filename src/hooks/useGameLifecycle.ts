@@ -8,12 +8,14 @@ import { hasBot, useGameStore } from "@/state/game";
 import { isFlagged, isUnlimited } from "@/engine/clock";
 import { drawClaim, seenPositions } from "@/ai/fly/planner";
 import { finishGame } from "@/game/session";
+import { presetGoal, puzzleVerdict } from "@/engine/positions";
 
 export function useGameLifecycle(): void {
   const fen = useGameStore((s) => s.fen);
   const phase = useGameStore((s) => s.phase);
   const clock = useGameStore((s) => s.clock);
   const myColor = useGameStore((s) => s.myColor);
+  const result = useGameStore((s) => s.result);
   const warned = useRef(false);
 
   useEffect(() => {
@@ -31,6 +33,15 @@ export function useGameLifecycle(): void {
       if(reason) finishGame({winner:null,reason});
     }
   }, [fen, phase]);
+
+  // A test from the Positions tab is judged after every move, and stops once decided.
+  useEffect(() => {
+    const { solver, verdict, startFen, chess, setVerdict } = useGameStore.getState();
+    const goal = presetGoal(startFen);
+    if (phase === "lobby" || !solver || verdict || !goal) return;
+    const decided = puzzleVerdict(goal, startFen, chess, result);
+    if (decided) setVerdict(decided);
+  }, [fen, phase, result]);
 
   useEffect(() => {
     const { timeControl } = useGameStore.getState();

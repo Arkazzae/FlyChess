@@ -11,6 +11,7 @@ import { IconBrain, IconBulb, IconChevron, IconFlag, IconFlip, IconUndo } from "
 export function MobileBar() {
   const { t } = useTranslation();
   const phase = useGameStore((s) => s.phase);
+  const solver = useGameStore((s) => s.solver);
   const moves = useGameStore((s) => s.moves);
   const myColor = useGameStore((s) => s.myColor);
   const viewPly = useGameStore((s) => s.viewPly);
@@ -60,7 +61,7 @@ export function MobileBar() {
       <nav className="mobile-bar mobile-bar--ended" aria-label={t("nav.menu")}>
         <button type="button" onClick={backToLobby}>{t("game.newGame")}</button>
         <button type="button" onClick={() => { setViewPly(0); setPanelTab("review"); }}>{t("panel.review")}</button>
-        <button type="button" className="is-primary" onClick={rematch}>{t("game.rematch")}</button>
+        <button type="button" className="is-primary" onClick={rematch}>{t(solver ? "positions.again" : "game.rematch")}</button>
       </nav>
     );
   }

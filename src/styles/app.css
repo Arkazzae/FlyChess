@@ -1001,6 +1001,36 @@ details.panel-section[open] summary { margin-bottom: 10px; }
 
 .model-subtitle { margin-left: 8px; font-weight: 500; text-transform: none; letter-spacing: normal; }
 
+/* ── Positions tab (bot screen) ── */
+.position-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.position-card { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 6px 6px 7px; border: 0; border-radius: 6px; background: var(--btn); box-shadow: 0 2px 0 var(--btn-shadow); color: var(--text-2); text-align: left; cursor: pointer; }
+.position-card:hover { background: var(--btn-hi); }
+.position-card.is-selected { box-shadow: 0 0 0 3px var(--green), 0 2px 0 var(--btn-shadow); color: #fff; }
+.position-card__name { margin-top: 2px; font-size: 12.5px; font-weight: 700; line-height: 1.2; }
+.position-card__goal { font-size: 11px; line-height: 1.25; color: var(--muted); }
+.mini-board { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); width: 100%; aspect-ratio: 1; border-radius: 3px; overflow: hidden; }
+.mini-board__sq { position: relative; background: var(--board-light); }
+.mini-board__sq.is-dark { background: var(--board-dark); }
+.mini-board__sq img { position: absolute; inset: 0; width: 100%; height: 100%; }
+.start-details { display: flex; flex-direction: column; margin-top: 10px; }
+.start-960 { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; }
+.start-960 strong { font-variant-numeric: tabular-nums; }
+.start-960__shuffle { flex: none; padding: 7px 14px; font-size: 14px; }
+.fen-field { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.fen-field input {
+  flex: 1;
+  min-width: 0;
+  background: var(--panel-deep);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 8px 10px;
+  font: 12.5px/1.3 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+.fen-field input[aria-invalid="true"] { border-color: var(--inhibit); }
+.start-status { margin: 6px 0 0; font-size: 12.5px; color: var(--text-2); }
+.start-status.is-error { color: var(--inhibit); }
+.start-note { margin: 8px 0 0; font-size: 11.5px; line-height: 1.4; color: var(--muted); }
 /* A test's outcome beside its name in the game tab. */
 .opening-row .verdict { flex: none; margin-left: auto; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 800; background: var(--btn); color: var(--text-2); }
 .opening-row .verdict--solved { background: var(--green); color: #fff; }

@@ -30,6 +30,7 @@ All four flies share the exact same brain (**DROSO-1**). The only difference is 
 - **Three Stockfish-powered characters:** If you want a break from the fly, three other insects pick from Stockfish's ideas in their own style—**Marvin** (a beginner beetle who grabs everything and hangs pieces), **Nelsen** (a wasp who brings his queen out early), and **Mitzi** (a polite ladybug in knitted mittens who rarely misses a tactic).
 - **Custom Stockfish:** Play the classic Stockfish engine directly at whatever skill level, search depth, and time limit you prefer.
 - **Bot vs. Bot:** Pair any two bots—including the fly against itself—and watch them play. Pause anytime to inspect the board or peek inside the brain.
+- **Positions:** The *Positions* tab is a test bench for the fly: pick one of seven test positions (two mates in 2, a knight fork, the queen and rook mates, and the Lucena and Philidor rook endgames), a shuffled **Chess960** back rank, or any position pasted as FEN, and press *“⟨fly⟩ solves”*. The fly you picked in *You vs a bot* takes the side to move, Stockfish at full strength plays the other side, and you watch. Puzzles end with a verdict (solved, or not within the moves allowed); endgames are judged by the result. Chess960 is played without castling because the rules library used here (chess.js) cannot castle in Chess960.
 
 ---
 

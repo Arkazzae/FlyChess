@@ -13,8 +13,10 @@ import { useTranslation } from "@/i18n";
 export function RightPanel() {
   const phase = useGameStore((s) => s.phase);
   const gameSeats = useGameStore((s) => s.seats);
-  useUiStore((s) => s.mode);
+  const mode = useUiStore((s) => s.mode);
+  const solver = useGameStore((s) => s.solver);
   useUiStore((s) => s.opponent);
+  useUiStore((s) => s.fly);
   useUiStore((s) => s.match);
   const tab = useUiStore((s) => s.panelTab);
   const setTab = useUiStore((s) => s.setPanelTab);
@@ -24,7 +26,10 @@ export function RightPanel() {
   const bots = [seats.w, seats.b].filter((seat) => !!seat).map((seat) => getOpponent(seat!.id));
   // The brain tab only exists while a fly is at the board.
   const brain = hasFly(seats);
-  const title = bots.length === 2 ? t(isFlyMirror(seats) ? "panel.titleSelf" : "panel.titleMatch")
+  // The Positions tab, and the test it starts, belong to the fly solving.
+  const solving = phase === "lobby" ? mode === "positions" : solver !== null;
+  const title = solving ? t("panel.titleSolve")
+    : bots.length === 2 ? t(isFlyMirror(seats) ? "panel.titleSelf" : "panel.titleMatch")
     : bots[0] && bots[0].kind !== "fly" ? t(`bot.${bots[0].id}.title`) : t("panel.title");
   const shown = tab === "brain" && !brain ? "game" : tab;
 

@@ -49,13 +49,17 @@ export function PlayerBar({ side }: { side: PieceColor }) {
   const chess = useGameStore((s) => s.chess);
   useGameStore((s) => s.fen);
   // Before the game the bars preview the choices on the bot screen (a random colour shows as White).
-  useUiStore((s) => s.mode);
+  const mode = useUiStore((s) => s.mode);
   useUiStore((s) => s.opponent);
   useUiStore((s) => s.match);
   useUiStore((s) => s.engine);
+  useUiStore((s) => s.positionPick);
+  useUiStore((s) => s.chess960);
+  useUiStore((s) => s.customFen);
   const uiSide = useUiStore((s) => s.side);
   const { t, locale } = useTranslation();
-  const seat: Seat | null = phase === "lobby" ? lobbySeats(uiSide === "random" ? "w" : uiSide)[side] : gameSeats[side];
+  // In the Positions tab the seats follow the picked position (the fly on the side to move).
+  const seat: Seat | null = phase === "lobby" ? lobbySeats(mode === "positions" ? undefined : uiSide === "random" ? "w" : uiSide)[side] : gameSeats[side];
   const bot = seat ? getOpponent(seat.id) : null;
   const opponent: PieceColor = side === "w" ? "b" : "w";
   // Pieces this side has taken are the opponent's lost pieces.

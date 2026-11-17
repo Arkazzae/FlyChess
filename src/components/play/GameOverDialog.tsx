@@ -6,6 +6,7 @@ import { getOpponent, type Seat } from "@/ai/bots";
 import { backToLobby, hasFly, isFlyMirror, reasonText, rematch } from "@/game/session";
 import { useTranslation } from "@/i18n";
 import type { PieceColor } from "@/engine/types";
+import { presetGoal, startLabel } from "@/engine/positions";
 
 /** Quips per outcome: the fly's own, two per character and the engine, a few for a match. */
 function quipKey(seats: Record<PieceColor, Seat | null>, spectating: boolean, outcome: "win" | "loss" | "draw", quip: number): string {
@@ -18,6 +19,9 @@ function quipKey(seats: Record<PieceColor, Seat | null>, spectating: boolean, ou
 export function GameOverDialog() {
   const phase = useGameStore((s) => s.phase);
   const result = useGameStore((s) => s.result);
+  const verdict = useGameStore((s) => s.verdict);
+  const solver = useGameStore((s) => s.solver);
+  const startFen = useGameStore((s) => s.startFen);
   const myColor = useGameStore((s) => s.myColor);
   const seats = useGameStore((s) => s.seats);
   const spectating = useGameStore(isSpectating);
@@ -29,22 +33,25 @@ export function GameOverDialog() {
   const { t } = useTranslation();
 
   useEffect(() => {
-    if (phase !== "ended" || !result) return;
+    if (phase !== "ended" || (!result && !verdict)) return;
     // Let the last move land before the dialog covers the board.
     const timer = setTimeout(() => setOpen(true), 450);
     return () => clearTimeout(timer);
-  }, [phase, result]);
+  }, [phase, result, verdict]);
   useEffect(() => {
     if (phase !== "ended") setOpen(false);
   }, [phase]);
 
-  if (!open || !result) return null;
-  const won = result.winner !== null && result.winner === myColor;
-  const draw = result.winner === null;
+  if (!open || (!result && !verdict)) return null;
+  // A test from the Positions tab ends with its verdict; a test stopped early (a mate in 2 missed) has no chess result.
+  const test = solver && verdict ? { solved: verdict === "solved", label: startLabel(startFen), goal: presetGoal(startFen) } : null;
+  const won = !!result && result.winner !== null && result.winner === myColor;
+  const draw = !result || result.winner === null;
   const opponent = myColor ? seats[myColor === "w" ? "b" : "w"] : null;
   const rival = opponent ? getOpponent(opponent.id) : null;
-  const title = draw ? t("over.draw")
-    : spectating ? t(result.winner === "w" ? "over.whiteWon" : "over.blackWon")
+  const title = test ? t(`verdict.${verdict}`)
+    : draw ? t("over.draw")
+    : spectating ? t(result!.winner === "w" ? "over.whiteWon" : "over.blackWon")
     : won ? t("over.won")
     : rival && rival.kind !== "fly" ? t(`bot.${rival.id}.over`) : t("over.lost");
   const outcome = draw ? "draw" : won ? "win" : "loss";
@@ -68,18 +75,30 @@ export function GameOverDialog() {
 
   return (
     <div className="game-over" role="dialog" aria-modal="true" aria-labelledby="game-over-title">
-      <div className={`game-over__card${won ? " is-win" : draw || spectating ? " is-draw" : " is-loss"}`}>
+      <div className={`game-over__card${test ? (test.solved ? " is-win" : " is-loss") : won ? " is-win" : draw || spectating ? " is-draw" : " is-loss"}`}>
         <button type="button" className="game-over__close" onClick={() => setOpen(false)} aria-label={t("over.close")}>×</button>
         <header>
-          <span className="game-over__trophy" aria-hidden="true">{won || (spectating && !draw) ? "🏆" : draw ? "🤝" : rival?.kind === "fly" ? "🪰" : "🏁"}</span>
+          <span className="game-over__trophy" aria-hidden="true">{test ? (test.solved ? "🏆" : "🪰") : won || (spectating && !draw) ? "🏆" : draw ? "🤝" : rival?.kind === "fly" ? "🪰" : "🏁"}</span>
           <h2 id="game-over-title">{title}</h2>
-          <p>{reasonText(result.reason)}</p>
-          <p className="game-over__quip">{t(quipKey(seats, spectating, outcome, quip))}</p>
+          {test ? (
+            <>
+              {test.label.kind === "preset" && <p>{t(`preset.${test.label.id}`)} · {t(`preset.${test.label.id}.goal`)}</p>}
+              <p className="game-over__quip">
+                {result ? `${t(result.winner === null ? "over.draw" : result.winner === "w" ? "over.whiteWon" : "over.blackWon")} ${reasonText(result.reason)}`
+                  : test.goal && "moves" in test.goal ? t("verdict.outOfMoves", { n: test.goal.moves }) : null}
+              </p>
+            </>
+          ) : (
+            <>
+              <p>{reasonText(result!.reason)}</p>
+              <p className="game-over__quip">{t(quipKey(seats, spectating, outcome, quip))}</p>
+            </>
+          )}
         </header>
         <div className="game-over__players">
-          {figure(left, result.winner === left)}
+          {figure(left, test ? test.solved && solver === left : result?.winner === left)}
           <span className="game-over__vs">vs</span>
-          {figure(right, result.winner === right)}
+          {figure(right, test ? test.solved && solver === right : result?.winner === right)}
         </div>
         <div className="game-over__actions">
           <button type="button" className="btn btn--green btn--big" onClick={() => {
@@ -88,7 +107,7 @@ export function GameOverDialog() {
             setViewPly(0);
             document.querySelector(".app__main")?.scrollTo({ top: 0, behavior: "smooth" });
           }}>{t("review.open")}</button>
-          <button type="button" className="btn btn--big" onClick={rematch}>{t("game.rematch")}</button>
+          <button type="button" className="btn btn--big" onClick={rematch}>{t(solver ? "positions.again" : "game.rematch")}</button>
           <div className="game-over__row">
             <button type="button" className="btn" onClick={backToLobby}>{t("game.newGame")}</button>
             {hasFly(seats) && (
